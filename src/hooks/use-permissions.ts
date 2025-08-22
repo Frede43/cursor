@@ -57,41 +57,80 @@ export const MENU_PERMISSIONS = {
   // Dashboard - accessible à tous les utilisateurs connectés
   dashboard: [],
   
-  // Ventes
+  // Ventes - permissions étendues
   sales: ['sales.view', 'sales.create'],
   'sales-history': ['sales.history'],
+  'sales-manage': ['sales.manage'],
+  'sales-refund': ['sales.refund'],
+  'sales-discount': ['sales.discount'],
   
-  // Produits et stocks
+  // Produits et stocks - permissions étendues
   products: ['products.view'],
+  'products-create': ['products.create'],
+  'products-edit': ['products.edit'],
+  'products-delete': ['products.delete'],
   stocks: ['stocks.view'],
   'stock-sync': ['stocks.manage'],
+  'stocks-adjust': ['stocks.adjust'],
+  'stocks-transfer': ['stocks.transfer'],
   supplies: ['stocks.manage'],
   
-  // Tables et commandes
+  // Tables et commandes - permissions étendues
   tables: ['tables.view'],
+  'tables-manage': ['tables.manage'],
   orders: ['orders.view'],
+  'orders-create': ['orders.create'],
+  'orders-edit': ['orders.edit'],
+  'orders-cancel': ['orders.cancel'],
   
-  // Cuisine
+  // Cuisine - permissions étendues
   kitchen: ['kitchen.view'],
+  'kitchen-manage': ['kitchen.manage'],
   
-  // Rapports et analyses
+  // Rapports et analyses - permissions étendues
   'daily-report': ['reports.view'],
   reports: ['reports.view'],
+  'reports-export': ['reports.export'],
   analytics: ['analytics.view'],
+  'analytics-advanced': ['analytics.advanced'],
   
-  // Administration
+  // Administration - permissions étendues
   users: ['users.view'],
+  'users-create': ['users.create'],
+  'users-edit': ['users.edit'],
+  'users-delete': ['users.delete'],
+  'users-permissions': ['users.permissions'],
   suppliers: ['suppliers.view'],
+  'suppliers-manage': ['suppliers.manage'],
   expenses: ['expenses.view'],
+  'expenses-create': ['expenses.create'],
+  'expenses-approve': ['expenses.approve'],
+  'expenses-manage': ['expenses.manage'],
   
-  // Système
+  // Système - permissions étendues
   settings: ['settings.view'],
+  'settings-manage': ['settings.manage'],
   alerts: [], // Accessible à tous
-  monitoring: ['settings.view'],
+  monitoring: ['monitoring.view'],
+  'system-backup': ['system.backup'],
+  'system-maintenance': ['system.maintenance'],
   help: [], // Accessible à tous
   
   // Profil - accessible à tous
   profile: [],
+  
+  // Permissions spéciales pour caissiers
+  'cashier-sales': ['sales.view', 'sales.create'],
+  'cashier-history': ['sales.history'],
+  'cashier-refund': ['sales.refund'],
+  
+  // Permissions spéciales pour serveurs
+  'server-orders': ['orders.view', 'orders.create'],
+  'server-tables': ['tables.view'],
+  
+  // Permissions spéciales pour managers
+  'manager-reports': ['reports.view', 'analytics.view'],
+  'manager-users': ['users.view', 'users.edit'],
 } as const;
 
 /**
@@ -105,7 +144,7 @@ export function useCanAccessMenu(menuKey: keyof typeof MENU_PERMISSIONS) {
     return true;
   }
   
-  return useHasAnyPermission(requiredPermissions);
+  return useHasAnyPermission([...requiredPermissions]);
 }
 
 /**

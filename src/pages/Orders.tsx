@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { useOrders, useUpdateOrderStatus, useKitchenQueue } from "@/hooks/use-api";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { useOrders, useUpdateOrderStatus, useKitchenQueue, useTables, useMenuItems, useCreateOrder } from "@/hooks/use-api";
 import { useToast } from "@/hooks/use-toast";
 import { Order, OrderItem } from "@/types/api";
 import {
@@ -21,7 +26,13 @@ import {
   Package,
   Play,
   Pause,
-  Check
+  Check,
+  Plus,
+  Search,
+  Filter,
+  RefreshCw,
+  Minus,
+  X
 } from "lucide-react";
 
 
@@ -30,6 +41,15 @@ export default function Orders() {
   const [searchParams] = useSearchParams();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTable, setSelectedTable] = useState("all");
+  const [showNewOrderDialog, setShowNewOrderDialog] = useState(false);
+  const [newOrder, setNewOrder] = useState({
+    table_id: "",
+    notes: "",
+    priority: "normal" as const,
+    items: [] as { menu_item_id: number; quantity: number; notes: string }[]
+  });
   const { toast } = useToast();
 
   // Récupérer les paramètres de table depuis l'URL
@@ -44,13 +64,30 @@ export default function Orders() {
   });
   
   const { data: kitchenData } = useKitchenQueue();
+  const { data: tablesData } = useTables();
+  const { data: menuItemsData } = useMenuItems();
   const updateOrderMutation = useUpdateOrderStatus();
+  const createOrderMutation = useCreateOrder();
   
   const orders = ordersData?.results || [];
   const kitchenOrders = (kitchenData as Order[]) || [];
+  const tables = tablesData?.results || [];
+  const menuItems = menuItemsData?.results || [];
 
   // Extract unique servers from orders
   const servers = Array.from(new Set(orders.map(order => `${order.server.first_name} ${order.server.last_name}`)));
+
+  // Filtered orders based on search and filters
+  const filteredOrders = orders.filter(order => {
+    const matchesSearch = searchTerm === "" || 
+      order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      `${order.server.first_name} ${order.server.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.table.number.toString().includes(searchTerm);
+    
+    const matchesTable = selectedTable === "all" || order.table.id.toString() === selectedTable;
+    
+    return matchesSearch && matchesTable;
+  });
 
   // Update current time every minute
   useEffect(() => {
@@ -115,7 +152,73 @@ export default function Orders() {
   };
 
   const getOrdersByStatus = (status: Order["status"]) => {
-    return orders.filter(order => order.status === status);
+    return filteredOrders.filter(order => order.status === status);
+  };
+
+  const addItemToOrder = (menuItemId: number) => {
+    const existingItem = newOrder.items.find(item => item.menu_item_id === menuItemId);
+    if (existingItem) {
+      setNewOrder(prev => ({
+        ...prev,
+        items: prev.items.map(item =>
+          item.menu_item_id === menuItemId
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        )
+      }));
+    } else {
+      setNewOrder(prev => ({
+        ...prev,
+        items: [...prev.items, { menu_item_id: menuItemId, quantity: 1, notes: "" }]
+      }));
+    }
+  };
+
+  const removeItemFromOrder = (menuItemId: number) => {
+    setNewOrder(prev => ({
+      ...prev,
+      items: prev.items.filter(item => item.menu_item_id !== menuItemId)
+    }));
+  };
+
+  const updateItemQuantity = (menuItemId: number, quantity: number) => {
+    if (quantity <= 0) {
+      removeItemFromOrder(menuItemId);
+      return;
+    }
+    setNewOrder(prev => ({
+      ...prev,
+      items: prev.items.map(item =>
+        item.menu_item_id === menuItemId
+          ? { ...item, quantity }
+          : item
+      )
+    }));
+  };
+
+  const createNewOrderHandler = async () => {
+    if (!newOrder.table_id || newOrder.items.length === 0) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez sélectionner une table et ajouter des articles",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      await createOrderMutation.mutateAsync(newOrder);
+      setShowNewOrderDialog(false);
+      setNewOrder({
+        table_id: "",
+        notes: "",
+        priority: "normal",
+        items: []
+      });
+      refetch();
+    } catch (error) {
+      // Error handling is done in the mutation hook
+    }
   };
 
   const getAveragePreparationTime = () => {
@@ -212,6 +315,152 @@ export default function Orders() {
                 <p className="text-sm text-muted-foreground">Temps moyen de préparation</p>
                 <p className="text-xl font-bold">{getAveragePreparationTime()} min</p>
               </div>
+              <Dialog open={showNewOrderDialog} onOpenChange={setShowNewOrderDialog}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Nouvelle commande
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Créer une nouvelle commande</DialogTitle>
+                    <DialogDescription>
+                      Sélectionnez une table et ajoutez des articles au menu
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Order Details */}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Table</Label>
+                        <Select value={newOrder.table_id} onValueChange={(value) => setNewOrder(prev => ({...prev, table_id: value}))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner une table" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {tables.map((table: any) => (
+                              <SelectItem key={table.id} value={table.id.toString()}>
+                                Table {table.number} ({table.capacity} places) - {table.location}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Priorité</Label>
+                        <Select value={newOrder.priority} onValueChange={(value: any) => setNewOrder(prev => ({...prev, priority: value}))}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="normal">Normal</SelectItem>
+                            <SelectItem value="high">Prioritaire</SelectItem>
+                            <SelectItem value="urgent">Urgent</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Notes (optionnel)</Label>
+                        <Textarea
+                          placeholder="Instructions spéciales..."
+                          value={newOrder.notes}
+                          onChange={(e) => setNewOrder(prev => ({...prev, notes: e.target.value}))}
+                        />
+                      </div>
+
+                      {/* Order Items */}
+                      <div className="space-y-2">
+                        <Label>Articles commandés ({newOrder.items.length})</Label>
+                        <div className="border rounded-lg p-4 max-h-48 overflow-y-auto">
+                          {newOrder.items.length === 0 ? (
+                            <p className="text-muted-foreground text-center py-4">Aucun article ajouté</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {newOrder.items.map((item) => {
+                                const menuItem = menuItems.find((mi: any) => mi.id === item.menu_item_id);
+                                return (
+                                  <div key={item.menu_item_id} className="flex items-center justify-between p-2 bg-muted rounded">
+                                    <div>
+                                      <span className="font-medium">{menuItem?.name}</span>
+                                      <span className="text-sm text-muted-foreground ml-2">
+                                        {menuItem?.price?.toLocaleString()} FBu
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => updateItemQuantity(item.menu_item_id, item.quantity - 1)}
+                                      >
+                                        <Minus className="h-3 w-3" />
+                                      </Button>
+                                      <span className="w-8 text-center">{item.quantity}</span>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => updateItemQuantity(item.menu_item_id, item.quantity + 1)}
+                                      >
+                                        <Plus className="h-3 w-3" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => removeItemFromOrder(item.menu_item_id)}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Menu Items */}
+                    <div className="space-y-4">
+                      <Label>Menu - Cliquez pour ajouter</Label>
+                      <div className="border rounded-lg p-4 max-h-96 overflow-y-auto">
+                        <div className="grid gap-2">
+                          {menuItems.map((item: any) => (
+                            <div
+                              key={item.id}
+                              className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                              onClick={() => addItemToOrder(item.id)}
+                            >
+                              <div>
+                                <h4 className="font-medium">{item.name}</h4>
+                                <p className="text-sm text-muted-foreground">{item.description}</p>
+                                <p className="text-sm font-semibold text-primary">
+                                  {item.price?.toLocaleString()} FBu
+                                </p>
+                              </div>
+                              <Plus className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button variant="outline" onClick={() => setShowNewOrderDialog(false)}>
+                      Annuler
+                    </Button>
+                    <Button 
+                      onClick={createNewOrderHandler}
+                      disabled={createOrderMutation.isPending}
+                    >
+                      {createOrderMutation.isPending ? "Création..." : "Créer la commande"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
 
@@ -245,6 +494,43 @@ export default function Orders() {
               </CardContent>
             </Card>
           )}
+
+          {/* Search and Filters */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Rechercher par numéro, serveur, table..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Select value={selectedTable} onValueChange={setSelectedTable}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Toutes les tables" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes les tables</SelectItem>
+                      {tables.map((table: any) => (
+                        <SelectItem key={table.id} value={table.id.toString()}>
+                          Table {table.number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" onClick={() => refetch()}>
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Stats Overview */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">

@@ -25,6 +25,11 @@ class UserSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         password = validated_data.pop('password')
+        
+        # Normaliser le nom d'utilisateur en minuscules pour cohérence avec le frontend
+        if 'username' in validated_data:
+            validated_data['username'] = validated_data['username'].lower()
+            
         user = User.objects.create_user(**validated_data)
         user.set_password(password)
         user.save()
@@ -192,6 +197,11 @@ class UserWithPermissionsSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
+        
+        # Normaliser le nom d'utilisateur en minuscules pour cohérence avec le frontend
+        if 'username' in validated_data:
+            validated_data['username'] = validated_data['username'].lower()
+            
         user = User.objects.create_user(**validated_data)
         if password:
             user.set_password(password)
@@ -233,6 +243,10 @@ class CreateUserSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         permissions_codes = validated_data.pop('permissions', [])
         password = validated_data.pop('password')
+
+        # Normaliser le nom d'utilisateur en minuscules pour cohérence avec le frontend
+        if 'username' in validated_data:
+            validated_data['username'] = validated_data['username'].lower()
 
         # Créer l'utilisateur
         user = User.objects.create_user(**validated_data)

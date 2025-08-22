@@ -1,5 +1,8 @@
+import { useState, useEffect, useMemo } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { useStockNotifications } from "@/hooks/use-stock-notifications";
+import { useOrderNotifications } from "@/hooks/use-order-notifications";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { AlertsWidget } from "@/components/dashboard/AlertsWidget";
@@ -19,13 +22,16 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { useDashboardStats, useUnresolvedAlerts, useLowStockProducts, useSalesStats } from "@/hooks/use-api";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useMemo } from "react";
 import { DashboardStats, SalesStats } from "@/types/api";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { StatsCardSkeleton, ChartSkeleton } from "@/components/ui/loading-skeleton";
 
 const Index = () => {
   const { toast } = useToast();
+  
+  // Activer les notifications automatiques
+  useStockNotifications();
+  useOrderNotifications();
   
   // Hooks pour récupérer les données depuis l'API
   const {
@@ -266,6 +272,7 @@ const Index = () => {
               </Card>
               </ErrorBoundary>
             </div>
+
           </div>
         </main>
       </div>

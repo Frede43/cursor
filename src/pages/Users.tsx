@@ -26,7 +26,7 @@ import {
   UserX,
   RefreshCw
 } from "lucide-react";
-import { useUsers, useUserActivities, useCreateUser, usePermissions, useAssignPermissions } from "@/hooks/use-api";
+import { useUsers, useUserActivities, useCreateUser, usePermissions, useAssignPermissions, useDeleteUser } from "@/hooks/use-api";
 import { useMutation } from '@tanstack/react-query';
 import { apiService } from '@/services/api';
 import { User as APIUser, UserActivity } from "@/types/api";
@@ -97,9 +97,8 @@ export default function Users() {
 
   // Hook pour créer un utilisateur
   const createUserMutation = useCreateUser();
-
-  // Hook pour assigner des permissions
   const assignPermissionsMutation = useAssignPermissions();
+  const deleteUserMutation = useDeleteUser();
 
   // Hook pour mettre à jour un utilisateur
   const updateUserMutation = useMutation({
@@ -190,9 +189,14 @@ export default function Users() {
     updateUserStatusMutation.mutate({ userId, status });
   };
 
-  const deleteUser = (userId: string) => {
+  const deleteUser = async (userId: string) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ?")) {
-      setUsers(prev => prev.filter(user => user.id !== userId));
+      try {
+        await deleteUserMutation.mutateAsync(userId);
+        refetchUsers();
+      } catch (error) {
+        // Error handling is done in the mutation hook
+      }
     }
   };
 
