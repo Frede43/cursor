@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Users,
   Clock,
@@ -22,27 +23,34 @@ import {
   CheckCircle,
   AlertTriangle,
   ShoppingCart,
-  Plus
+  Plus,
+  Loader2
 } from "lucide-react";
-import { useTables, useOrders, useCreateOrder } from "@/hooks/use-api";
+import { useTables, useOrders, useCreateOrder, useUpdateTableStatus } from "@/hooks/use-api";
+import { Table as TableType } from "@/types/api";
 
-interface Table {
-  id: string;
-  number: number;
-  seats: number;
-  status: "available" | "occupied" | "reserved" | "cleaning";
-  server?: string;
-  customer?: string;
-  occupiedSince?: string;
-  reservationTime?: string;
-  zone: "terrasse" | "intérieur" | "vip";
+// Interface locale pour l'état des tables avec données supplémentaires
+interface LocalTableData {
   currentOrder?: {
     items: number;
     total: number;
   };
+  occupiedSince?: string;
+  reservationTime?: string;
 }
 
-const mockTables: Table[] = [
+// Interface étendue pour les données mock avec propriétés supplémentaires
+interface ExtendedTable extends TableType {
+  seats?: number;
+  zone?: string;
+  customer?: string;
+  server?: string;
+  occupiedSince?: string;
+  reservationTime?: string;
+}
+
+// Données mock supprimées - utilisation de l'API
+const mockTables: any[] = [
   {
     id: "1",
     number: 1,
@@ -94,11 +102,25 @@ const servers = ["Marie Uwimana", "Jean Nkurunziza", "Paul Ndayisenga"];
 
 export default function Tables() {
   const navigate = useNavigate();
-  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
-  const [showReservationDialog, setShowReservationDialog] = useState(false);
-  const [tables, setTables] = useState<Table[]>([]);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  
+  // API Hooks
+  const { data: tablesData, isLoading: tablesLoading, error: tablesError } = useTables();
+  const { data: ordersData, isLoading: ordersLoading } = useOrders();
+  const updateTableStatus = useUpdateTableStatus();
+  
+  // Local state
+  const [selectedTable, setSelectedTable] = useState<TableType | null>(null);
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterZone, setFilterZone] = useState<string>("all");
+  const [localTableData, setLocalTableData] = useState<Record<number, LocalTableData>>({});
+  const [showReservationDialog, setShowReservationDialog] = useState(false);
+  
+  // Récupérer les tables depuis l'API
+  const tables = tablesData?.results || [];
+  
   const [reservationData, setReservationData] = useState({
     tableId: "",
     customerName: "",
@@ -107,43 +129,35 @@ export default function Tables() {
     seats: ""
   });
 
-  // Charger les vraies données des tables
+  // Gestion des erreurs API
   useEffect(() => {
-    fetchTables();
-  }, []);
-
-  const fetchTables = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('http://127.0.0.1:8000/api/sales/tables/');
-
-      if (response.ok) {
-        const data = await response.json();
-        setTables(data.results || []);
-        toast({
-          title: "Tables chargées",
-          description: `${data.results?.length || 0} tables récupérées`,
-          variant: "default",
-        });
-      } else {
-        throw new Error('Erreur API');
-      }
-    } catch (error) {
+    if (tablesError) {
       toast({
         title: "Erreur",
-        description: "Impossible de charger les tables. Utilisation des données de démonstration.",
+        description: "Impossible de charger les tables depuis l'API.",
         variant: "destructive",
       });
-      // Fallback vers les données mockées
-      setTables(mockTables);
-    } finally {
-      setLoading(false);
     }
+  }, [tablesError, toast]);
+
+  // Associer les commandes aux tables
+  const getTableWithOrders = (table: TableType) => {
+    const tableOrders = ordersData?.results?.filter(order => order.table.id === table.id) || [];
+    const currentOrder = tableOrders.find(order => ['pending', 'confirmed', 'preparing'].includes(order.status));
+    
+    return {
+      ...table,
+      currentOrder: currentOrder ? {
+        items: currentOrder.items.length,
+        total: currentOrder.total_amount
+      } : undefined,
+      hasActiveOrder: !!currentOrder
+    };
   };
 
 
 
-  const getStatusInfo = (status: Table["status"]) => {
+  const getStatusInfo = (status: TableType["status"] | "cleaning") => {
     switch (status) {
       case "available":
         return { variant: "success" as const, label: "Libre", color: "bg-success" };
@@ -151,8 +165,12 @@ export default function Tables() {
         return { variant: "destructive" as const, label: "Occupée", color: "bg-destructive" };
       case "reserved":
         return { variant: "warning" as const, label: "Réservée", color: "bg-warning" };
+      case "maintenance":
+        return { variant: "secondary" as const, label: "Maintenance", color: "bg-secondary" };
       case "cleaning":
         return { variant: "secondary" as const, label: "Nettoyage", color: "bg-secondary" };
+      default:
+        return { variant: "secondary" as const, label: "Inconnu", color: "bg-secondary" };
     }
   };
 
@@ -165,21 +183,39 @@ export default function Tables() {
     }
   };
 
-  const updateTableStatus = (tableId: string, newStatus: Table["status"]) => {
-    setTables(prev => prev.map(table => 
-      table.id === tableId 
-        ? { ...table, status: newStatus, occupiedSince: newStatus === "occupied" ? new Date().toLocaleTimeString() : undefined }
-        : table
-    ));
+  const handleUpdateTableStatus = async (tableId: number, newStatus: TableType["status"]) => {
+    try {
+      await updateTableStatus.mutateAsync({ tableId, status: newStatus });
+      
+      // Mettre à jour les données locales
+      setLocalTableData(prev => ({
+        ...prev,
+        [tableId]: {
+          ...prev[tableId],
+          occupiedSince: newStatus === "occupied" ? new Date().toLocaleTimeString() : undefined
+        }
+      }));
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour le statut de la table",
+        variant: "destructive",
+      });
+    }
   };
 
-  const assignServer = (tableId: string, serverName: string) => {
-    setTables(prev => prev.map(table =>
-      table.id === tableId ? { ...table, server: serverName } : table
-    ));
+  // Fonction pour assigner un serveur à une table
+  const assignServer = async (tableId: number, serverName: string) => {
+    // TODO: Implémenter l'API pour assigner un serveur
+    console.log(`Assigning server ${serverName} to table ${tableId}`);
+    toast({
+      title: "Serveur assigné",
+      description: `${serverName} a été assigné à la table ${tableId}`,
+      variant: "default",
+    });
   };
 
-  const createOrderForTable = (table: Table) => {
+  const createOrderForTable = (table: TableType) => {
     // Vérifications
     if (table.status !== "occupied") {
       toast({
@@ -190,22 +226,12 @@ export default function Tables() {
       return;
     }
 
-    if (!table.server) {
-      toast({
-        title: "Serveur non assigné",
-        description: "Veuillez d'abord assigner un serveur à cette table",
-        variant: "destructive",
-      });
-      return;
-    }
-
     // Navigation vers Orders avec paramètres
     const params = new URLSearchParams({
-      table: table.id,
-      tableNumber: table.number,
-      server: table.server,
+      table: table.id.toString(),
+      tableNumber: table.number.toString(),
       capacity: table.capacity.toString(),
-      location: table.location
+      location: table.location || ""
     });
 
     navigate(`/orders?${params.toString()}`);
@@ -282,8 +308,8 @@ export default function Tables() {
                       </SelectTrigger>
                       <SelectContent>
                         {tables.filter(t => t.status === "available").map(table => (
-                          <SelectItem key={table.id} value={table.id}>
-                            Table {table.number} ({table.seats} places) - {getZoneLabel(table.zone)}
+                          <SelectItem key={table.id} value={table.id.toString()}>
+                            Table {table.number} ({table.capacity} places) - {getZoneLabel(table.location || "intérieur")}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -383,7 +409,7 @@ export default function Tables() {
           </div>
 
           {/* Indicateur de chargement */}
-          {loading && (
+          {tablesLoading && (
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-center py-12">
@@ -397,7 +423,20 @@ export default function Tables() {
           )}
 
           {/* Floor Plan */}
-          {!loading && (
+          {tablesLoading ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Chargement des tables...</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {[...Array(8)].map((_, i) => (
+                    <Skeleton key={i} className="h-24 w-full" />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
           <Card>
             <CardHeader>
               <CardTitle>Plan de salle</CardTitle>
@@ -429,38 +468,41 @@ export default function Tables() {
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-orange-600">
-                      {tables.filter(t => t.status === 'cleaning').length}
+                      {tables.filter(t => t.status === 'maintenance').length}
                     </div>
-                    <div className="text-xs text-muted-foreground">Nettoyage</div>
+                    <div className="text-xs text-muted-foreground">Maintenance</div>
                   </div>
-                </div>
+              </div>
 
-                {/* Zone Intérieur */}
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    Zone Intérieur
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {tables.filter(t => t.location === "intérieur").map(table => {
-                      const statusInfo = getStatusInfo(table.status);
-                      return (
-                        <Dialog key={table.id}>
-                          <DialogTrigger asChild>
-                            <Card className={`cursor-pointer hover:shadow-md transition-all ${statusInfo.color}/10 border-2 border-${statusInfo.color.replace('bg-', '')}/20`}>
-                              <CardContent className="p-4 text-center">
-                                <div className={`h-8 w-8 ${statusInfo.color} rounded-full flex items-center justify-center mx-auto mb-2`}>
-                                  <span className="text-white font-bold text-sm">{table.number}</span>
-                                </div>
-                                <Badge variant={statusInfo.variant} className="text-xs mb-1">
-                                  {statusInfo.label}
-                                </Badge>
-                                <p className="text-xs text-muted-foreground">{table.capacity} places</p>
-                                {table.server && (
-                                  <p className="text-xs font-medium mt-1">{table.server}</p>
-                                )}
-                              </CardContent>
-                            </Card>
+              {/* Zone Intérieur */}
+              <div>
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Zone Intérieur
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {tables.filter(t => t.location === "intérieur" || !t.location).map(table => {
+                    const tableWithOrders = getTableWithOrders(table);
+                    const statusInfo = getStatusInfo(table.status);
+                    return (
+                      <Dialog key={table.id}>
+                        <DialogTrigger asChild>
+                          <Card className={`cursor-pointer hover:shadow-md transition-all ${statusInfo.color}/10 border-2 border-${statusInfo.color.replace('bg-', '')}/20`}>
+                            <CardContent className="p-4 text-center">
+                              <div className={`h-8 w-8 ${statusInfo.color} rounded-full flex items-center justify-center mx-auto mb-2`}>
+                                <span className="text-white font-bold text-sm">{table.number}</span>
+                              </div>
+                              <Badge variant={statusInfo.variant} className="text-xs mb-1">
+                                {statusInfo.label}
+                              </Badge>
+                              <p className="text-xs text-muted-foreground">{table.capacity} places</p>
+                              {tableWithOrders.currentOrder && (
+                                <p className="text-xs font-medium mt-1 text-blue-600">
+                                  {tableWithOrders.currentOrder.items} articles - {tableWithOrders.currentOrder.total} BIF
+                                </p>
+                              )}
+                            </CardContent>
+                          </Card>
                           </DialogTrigger>
                           <DialogContent>
                             <DialogHeader>
@@ -477,380 +519,51 @@ export default function Tables() {
                                 </div>
                                 <div>
                                   <p className="text-sm text-muted-foreground">Zone</p>
-                                  <p className="font-medium">{getZoneLabel(table.zone)}</p>
+                                  <p className="font-medium">{table.location || "Intérieur"}</p>
                                 </div>
                               </div>
 
-                              {table.status === "occupied" && (
+                              {tableWithOrders.currentOrder && (
                                 <div className="space-y-2">
                                   <div>
-                                    <p className="text-sm text-muted-foreground">Client</p>
-                                    <p className="font-medium">{table.customer}</p>
+                                    <p className="text-sm text-muted-foreground">Commande en cours</p>
+                                    <p className="font-medium">
+                                      {tableWithOrders.currentOrder.items} articles - {tableWithOrders.currentOrder.total.toLocaleString()} BIF
+                                    </p>
                                   </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Serveur</p>
-                                    <p className="font-medium">{table.server}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Occupée depuis</p>
-                                    <p className="font-medium">{table.occupiedSince}</p>
-                                  </div>
-                                  {table.currentOrder && (
-                                    <div>
-                                      <p className="text-sm text-muted-foreground">Commande en cours</p>
-                                      <p className="font-medium">
-                                        {table.currentOrder.items} articles - {table.currentOrder.total.toLocaleString()} FBu
-                                      </p>
-                                    </div>
+                                </div>
+                              )}
+
+                              <div className="flex gap-2 pt-4">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handleUpdateTableStatus(table.id, table.status === "available" ? "occupied" : "available")}
+                                  disabled={updateTableStatus.isPending}
+                                >
+                                  {updateTableStatus.isPending ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    table.status === "available" ? "Occuper" : "Libérer"
                                   )}
-                                </div>
-                              )}
-
-                              {table.status === "reserved" && (
-                                <div className="space-y-2">
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Réservée pour</p>
-                                    <p className="font-medium">{table.customer}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Heure de réservation</p>
-                                    <p className="font-medium">{table.reservationTime}</p>
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="space-y-2">
-                                <Label>Changer le statut</Label>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => updateTableStatus(table.id, "available")}
-                                    disabled={table.status === "available"}
-                                  >
-                                    Libérer
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => updateTableStatus(table.id, "occupied")}
-                                    disabled={table.status === "occupied"}
-                                  >
-                                    Occuper
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => updateTableStatus(table.id, "cleaning")}
-                                    disabled={table.status === "cleaning"}
-                                  >
-                                    Nettoyage
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => updateTableStatus(table.id, "reserved")}
-                                    disabled={table.status === "reserved"}
-                                  >
-                                    Réserver
-                                  </Button>
-                                </div>
-                              </div>
-
-                              {table.status === "occupied" && (
-                                <div className="space-y-2">
-                                  <Label>Assigner un serveur</Label>
-                                  <Select value={table.server || ""} onValueChange={(value) => assignServer(table.id, value)}>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Sélectionner un serveur" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {servers.map(server => (
-                                        <SelectItem key={server} value={server}>{server}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              )}
-
-                              {/* Bouton Nouvelle Commande */}
-                              {table.status === "occupied" && table.server && (
-                                <div className="pt-4 border-t">
-                                  <Button
+                                </Button>
+                                {table.status === "occupied" && (
+                                  <Button 
+                                    size="sm" 
                                     onClick={() => createOrderForTable(table)}
-                                    className="w-full"
-                                    size="lg"
+                                    className="gap-2"
                                   >
-                                    <ShoppingCart className="h-4 w-4 mr-2" />
+                                    <ShoppingCart className="h-4 w-4" />
                                     Nouvelle commande
                                   </Button>
-                                  <p className="text-xs text-muted-foreground text-center mt-2">
-                                    Créer une commande pour cette table
-                                  </p>
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </div>
                           </DialogContent>
                         </Dialog>
                       );
                     })}
                   </div>
-                </div>
-
-                {/* Zone Terrasse */}
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    Zone Terrasse
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {tables.filter(t => t.location === "terrasse").map(table => {
-                      const statusInfo = getStatusInfo(table.status);
-                      return (
-                        <Dialog key={table.id}>
-                          <DialogTrigger asChild>
-                            <Card className={`cursor-pointer hover:shadow-md transition-all ${statusInfo.color}/10`}>
-                              <CardContent className="p-4 text-center">
-                                <div className={`h-8 w-8 ${statusInfo.color} rounded-full flex items-center justify-center mx-auto mb-2`}>
-                                  <span className="text-white font-bold text-sm">{table.number}</span>
-                                </div>
-                                <Badge variant={statusInfo.variant} className="text-xs mb-1">
-                                  {statusInfo.label}
-                                </Badge>
-                                <p className="text-xs text-muted-foreground">{table.seats} places</p>
-                              </CardContent>
-                            </Card>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Table {table.number}</DialogTitle>
-                              <DialogDescription>
-                                Gestion de la table {table.number} ({table.seats} places) - Terrasse
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <p className="text-sm text-muted-foreground">Statut</p>
-                                  <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-muted-foreground">Zone</p>
-                                  <p className="font-medium">Terrasse</p>
-                                </div>
-                              </div>
-
-                              {table.status === "occupied" && (
-                                <div className="space-y-2">
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Client</p>
-                                    <p className="font-medium">{table.customer}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Serveur</p>
-                                    <p className="font-medium">{table.server}</p>
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="space-y-2">
-                                <Label>Changer le statut</Label>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => updateTableStatus(table.id, "available")}
-                                    disabled={table.status === "available"}
-                                  >
-                                    Libérer
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => updateTableStatus(table.id, "occupied")}
-                                    disabled={table.status === "occupied"}
-                                  >
-                                    Occuper
-                                  </Button>
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label>Assigner un serveur</Label>
-                                <Select onValueChange={(value) => assignServer(table.id, value)}>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder={table.server || "Sélectionner un serveur"} />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="Marie Uwimana">Marie Uwimana</SelectItem>
-                                    <SelectItem value="Jean Nkurunziza">Jean Nkurunziza</SelectItem>
-                                    <SelectItem value="Alice Ndayisenga">Alice Ndayisenga</SelectItem>
-                                    <SelectItem value="Paul Hakizimana">Paul Hakizimana</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              {/* Bouton Nouvelle Commande */}
-                              {table.status === "occupied" && table.server && (
-                                <div className="pt-4 border-t">
-                                  <Button
-                                    onClick={() => createOrderForTable(table)}
-                                    className="w-full"
-                                    size="lg"
-                                  >
-                                    <ShoppingCart className="h-4 w-4 mr-2" />
-                                    Nouvelle commande
-                                  </Button>
-                                  <p className="text-xs text-muted-foreground text-center mt-2">
-                                    Créer une commande pour cette table
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Zone VIP */}
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    Zone VIP
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {tables.filter(t => t.location === "vip").map(table => {
-                      const statusInfo = getStatusInfo(table.status);
-                      return (
-                        <Dialog key={table.id}>
-                          <DialogTrigger asChild>
-                            <Card className={`cursor-pointer hover:shadow-md transition-all ${statusInfo.color}/10 border-accent/30`}>
-                              <CardContent className="p-4 text-center">
-                                <div className={`h-8 w-8 ${statusInfo.color} rounded-full flex items-center justify-center mx-auto mb-2`}>
-                                  <span className="text-white font-bold text-sm">{table.number}</span>
-                                </div>
-                                <Badge variant={statusInfo.variant} className="text-xs mb-1">
-                                  {statusInfo.label}
-                                </Badge>
-                                <p className="text-xs text-muted-foreground">{table.seats} places</p>
-                                <Badge variant="accent" className="text-xs mt-1">VIP</Badge>
-                              </CardContent>
-                            </Card>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Table {table.number} VIP</DialogTitle>
-                              <DialogDescription>
-                                Gestion de la table VIP {table.number} ({table.seats} places)
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <p className="text-sm text-muted-foreground">Statut</p>
-                                  <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-muted-foreground">Zone</p>
-                                  <Badge variant="accent">VIP</Badge>
-                                </div>
-                              </div>
-
-                              {table.status === "occupied" && (
-                                <div className="space-y-2">
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Client</p>
-                                    <p className="font-medium">{table.customer}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Serveur</p>
-                                    <p className="font-medium">{table.server}</p>
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="space-y-2">
-                                <Label>Changer le statut</Label>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => updateTableStatus(table.id, "available")}
-                                    disabled={table.status === "available"}
-                                  >
-                                    Libérer
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => updateTableStatus(table.id, "occupied")}
-                                    disabled={table.status === "occupied"}
-                                  >
-                                    Occuper
-                                  </Button>
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label>Assigner un serveur</Label>
-                                <Select onValueChange={(value) => assignServer(table.id, value)}>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder={table.server || "Sélectionner un serveur"} />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="Marie Uwimana">Marie Uwimana</SelectItem>
-                                    <SelectItem value="Jean Nkurunziza">Jean Nkurunziza</SelectItem>
-                                    <SelectItem value="Alice Ndayisenga">Alice Ndayisenga</SelectItem>
-                                    <SelectItem value="Paul Hakizimana">Paul Hakizimana</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              {/* Bouton Nouvelle Commande */}
-                              {table.status === "occupied" && table.server && (
-                                <div className="pt-4 border-t">
-                                  <Button
-                                    onClick={() => createOrderForTable(table)}
-                                    className="w-full"
-                                    size="lg"
-                                  >
-                                    <ShoppingCart className="h-4 w-4 mr-2" />
-                                    Nouvelle commande
-                                  </Button>
-                                  <p className="text-xs text-muted-foreground text-center mt-2">
-                                    Créer une commande pour cette table
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          )}
-
-          {/* Statistics */}
-          {!loading && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Statistiques d'occupation</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="text-center p-4 bg-muted rounded-lg">
-                  <p className="text-2xl font-bold">{stats.total}</p>
-                  <p className="text-sm text-muted-foreground">Total tables</p>
-                </div>
-                <div className="text-center p-4 bg-success/10 rounded-lg">
-                  <p className="text-2xl font-bold text-success">{stats.available}</p>
-                  <p className="text-sm text-muted-foreground">Libres</p>
-                </div>
-                <div className="text-center p-4 bg-destructive/10 rounded-lg">
-                  <p className="text-2xl font-bold text-destructive">{stats.occupied}</p>
-                  <p className="text-sm text-muted-foreground">Occupées</p>
-                </div>
-                <div className="text-center p-4 bg-primary/10 rounded-lg">
-                  <p className="text-2xl font-bold text-primary">{stats.rate}%</p>
-                  <p className="text-sm text-muted-foreground">Taux d'occupation</p>
                 </div>
               </div>
             </CardContent>

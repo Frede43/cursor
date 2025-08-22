@@ -421,6 +421,7 @@ export interface Table extends BaseModel {
 }
 
 export interface Order extends BaseModel {
+  order_number: string;
   table: {
     id: number;
     number: number;
