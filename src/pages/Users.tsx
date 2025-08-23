@@ -26,7 +26,7 @@ import {
   UserX,
   RefreshCw
 } from "lucide-react";
-import { useUsers, useUserActivities, useCreateUser, usePermissions, useAssignPermissions } from "@/hooks/use-api";
+import { useUsers, useUserActivities, useCreateUser, usePermissions, useAssignPermissions, useDeleteUser } from "@/hooks/use-api";
 import { useMutation } from '@tanstack/react-query';
 import { apiService } from '@/services/api';
 import { User as APIUser, UserActivity } from "@/types/api";
@@ -97,9 +97,8 @@ export default function Users() {
 
   // Hook pour créer un utilisateur
   const createUserMutation = useCreateUser();
-
-  // Hook pour assigner des permissions
   const assignPermissionsMutation = useAssignPermissions();
+  const deleteUserMutation = useDeleteUser();
 
   // Hook pour mettre à jour un utilisateur
   const updateUserMutation = useMutation({
@@ -190,9 +189,14 @@ export default function Users() {
     updateUserStatusMutation.mutate({ userId, status });
   };
 
-  const deleteUser = (userId: string) => {
+  const deleteUser = async (userId: string) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ?")) {
-      setUsers(prev => prev.filter(user => user.id !== userId));
+      try {
+        await deleteUserMutation.mutateAsync(userId);
+        refetchUsers();
+      } catch (error) {
+        // Error handling is done in the mutation hook
+      }
     }
   };
 
@@ -426,32 +430,51 @@ export default function Users() {
                       <p className="text-xs text-muted-foreground">Chargement...</p>
                     ) : (
                       <div className="border border-gray-200 rounded p-2 bg-gray-50">
-                        <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                          {Array.isArray(permissionsData) ? permissionsData.map((permission: any) => (
-                            <div key={permission.code} className="flex items-center space-x-1 p-1 hover:bg-white rounded transition-colors">
-                              <Checkbox
-                                id={permission.code}
-                                checked={newUser.permissions.includes(permission.code)}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setNewUser(prev => ({
-                                      ...prev,
-                                      permissions: [...prev.permissions, permission.code]
-                                    }));
-                                  } else {
-                                    setNewUser(prev => ({
-                                      ...prev,
-                                      permissions: prev.permissions.filter(p => p !== permission.code)
-                                    }));
-                                  }
-                                }}
-                                className="border-gray-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-3 w-3"
-                              />
-                              <Label htmlFor={permission.code} className="text-xs font-medium cursor-pointer">
-                                {permission.name}
-                              </Label>
-                            </div>
-                          )) : (
+                        <div className="max-h-48 overflow-y-auto pr-2">
+                          {Array.isArray(permissionsData) && permissionsData.length > 0 ? (
+                            <>
+                              {/* Grouper les permissions par catégorie */}
+                              {Object.entries(
+                                permissionsData.reduce((acc: {[key: string]: any[]}, permission: any) => {
+                                  const category = permission.category || 'Autre';
+                                  if (!acc[category]) acc[category] = [];
+                                  acc[category].push(permission);
+                                  return acc;
+                                }, {})
+                              ).map(([category, permissions]: [string, any[]]) => (
+                                <div key={category} className="mb-3">
+                                  <h4 className="text-xs font-semibold text-gray-700 mb-1 uppercase">{category}</h4>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {permissions.map((permission: any) => (
+                                      <div key={permission.code} className="flex items-center space-x-1 p-1 hover:bg-white rounded transition-colors">
+                                        <Checkbox
+                                          id={permission.code}
+                                          checked={newUser.permissions.includes(permission.code)}
+                                          onCheckedChange={(checked) => {
+                                            if (checked) {
+                                              setNewUser(prev => ({
+                                                ...prev,
+                                                permissions: [...prev.permissions, permission.code]
+                                              }));
+                                            } else {
+                                              setNewUser(prev => ({
+                                                ...prev,
+                                                permissions: prev.permissions.filter(p => p !== permission.code)
+                                              }));
+                                            }
+                                          }}
+                                          className="border-gray-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-3 w-3"
+                                        />
+                                        <Label htmlFor={permission.code} className="text-xs font-medium cursor-pointer">
+                                          {permission.name}
+                                        </Label>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </>
+                          ) : (
                             <p className="text-xs text-muted-foreground col-span-2 text-center py-2">Aucune permission disponible</p>
                           )}
                         </div>
@@ -843,32 +866,53 @@ export default function Users() {
                       <p className="text-xs text-muted-foreground">Chargement...</p>
                     ) : (
                       <div className="border border-gray-200 rounded p-2 bg-gray-50">
-                        <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                          {Array.isArray(permissionsData) ? permissionsData.map((permission: any) => (
-                            <div key={permission.code} className="flex items-center space-x-1 p-1 hover:bg-white rounded transition-colors">
-                              <Checkbox
-                                id={`edit-${permission.code}`}
-                                checked={editingUser.permissions.includes(permission.code)}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setEditingUser(prev => prev ? ({
-                                      ...prev,
-                                      permissions: [...prev.permissions, permission.code]
-                                    }) : null);
-                                  } else {
-                                    setEditingUser(prev => prev ? ({
-                                      ...prev,
-                                      permissions: prev.permissions.filter(p => p !== permission.code)
-                                    }) : null);
-                                  }
-                                }}
-                                className="border-gray-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-3 w-3"
-                              />
-                              <Label htmlFor={`edit-${permission.code}`} className="text-xs font-medium cursor-pointer">
-                                {permission.name}
-                              </Label>
-                            </div>
-                          )) : null}
+                        <div className="max-h-48 overflow-y-auto pr-2">
+                          {Array.isArray(permissionsData) && permissionsData.length > 0 ? (
+                            <>
+                              {/* Grouper les permissions par catégorie */}
+                              {Object.entries(
+                                permissionsData.reduce((acc: {[key: string]: any[]}, permission: any) => {
+                                  const category = permission.category || 'Autre';
+                                  if (!acc[category]) acc[category] = [];
+                                  acc[category].push(permission);
+                                  return acc;
+                                }, {})
+                              ).map(([category, permissions]: [string, any[]]) => (
+                                <div key={category} className="mb-3">
+                                  <h4 className="text-xs font-semibold text-gray-700 mb-1 uppercase">{category}</h4>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {permissions.map((permission: any) => (
+                                      <div key={permission.code} className="flex items-center space-x-1 p-1 hover:bg-white rounded transition-colors">
+                                        <Checkbox
+                                          id={`edit-${permission.code}`}
+                                          checked={editingUser.permissions.includes(permission.code)}
+                                          onCheckedChange={(checked) => {
+                                            if (checked) {
+                                              setEditingUser(prev => prev ? ({
+                                                ...prev,
+                                                permissions: [...prev.permissions, permission.code]
+                                              }) : null);
+                                            } else {
+                                              setEditingUser(prev => prev ? ({
+                                                ...prev,
+                                                permissions: prev.permissions.filter(p => p !== permission.code)
+                                              }) : null);
+                                            }
+                                          }}
+                                          className="border-gray-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-3 w-3"
+                                        />
+                                        <Label htmlFor={`edit-${permission.code}`} className="text-xs font-medium cursor-pointer">
+                                          {permission.name}
+                                        </Label>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </>
+                          ) : (
+                            <p className="text-xs text-muted-foreground col-span-2 text-center py-2">Aucune permission disponible</p>
+                          )}
                         </div>
                       </div>
                     )}

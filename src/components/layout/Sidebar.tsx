@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAccessibleMenus, useCanAccessMenu } from "@/hooks/use-permissions";
+import { useAccessibleMenus, useCanAccessMenu, useUserPermissions } from "@/hooks/use-permissions";
 import {
   BarChart3,
   Package,

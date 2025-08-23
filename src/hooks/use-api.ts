@@ -703,26 +703,155 @@ export function useAlerts(params?: {
   });
 }
 
-export function useCreateAlert() {
+
+export function useUpdateExpense() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   return useMutation({
-    mutationFn: (data: any) => apiService.post('/alerts/alerts/', data),
+    mutationFn: ({ id, data }: { id: string | number, data: any }) => 
+      apiService.put(`/expenses/${id}/`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
       toast({
-        title: "Alerte créée",
-        description: "La nouvelle alerte a été créée avec succès."
+        title: "Dépense mise à jour",
+        description: "La dépense a été mise à jour avec succès."
       });
     },
     onError: (error: any) => {
       toast({
         title: "Erreur",
-        description: error?.response?.data?.message || "Impossible de créer l'alerte.",
+        description: "Impossible de mettre à jour la dépense.",
         variant: "destructive"
       });
     }
+  });
+}
+
+export function useApproveExpense() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (expenseId: string | number) => 
+      apiService.post(`/expenses/${expenseId}/approve/`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast({
+        title: "Dépense approuvée",
+        description: "La dépense a été approuvée avec succès."
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'approuver la dépense.",
+        variant: "destructive"
+      });
+    }
+  });
+}
+
+export function useRejectExpense() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (expenseId: string | number) => 
+      apiService.post(`/expenses/${expenseId}/reject/`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast({
+        title: "Dépense rejetée",
+        description: "La dépense a été rejetée."
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de rejeter la dépense.",
+        variant: "destructive"
+      });
+    }
+  });
+}
+
+export function useBudgetSettings() {
+  return useQuery({
+    queryKey: ['budget-settings'],
+    queryFn: () => apiService.get('/expenses/budget-settings/'),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    retry: false, // Don't retry on 404
+    throwOnError: false, // Don't throw on error
+  });
+}
+
+export function useUpdateBudgetSettings() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (budgetData: any) => apiService.put('/expenses/budget-settings/', budgetData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budget-settings'] });
+      toast({
+        title: "Budget mis à jour",
+        description: "Les paramètres de budget ont été mis à jour."
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour le budget.",
+        variant: "destructive"
+      });
+    }
+  });
+}
+
+export function usePaymentMethods() {
+  return useQuery({
+    queryKey: ['payment-methods'],
+    queryFn: () => apiService.get('/expenses/payment-methods/'),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    retry: false, // Don't retry on 404
+    throwOnError: false, // Don't throw on error
+  });
+}
+
+export function useMenuItems(params?: {
+  category?: number;
+  is_available?: boolean;
+}) {
+  return useQuery<PaginatedResponse<any>, Error, PaginatedResponse<any>>({
+    queryKey: ['menu-items', params],
+    queryFn: () => apiService.get('/menu/items/', { params }),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+export function useCreateOrder() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (orderData: any) => apiService.post('/orders/', orderData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['kitchen-queue'] });
+      toast({
+        title: "Commande créée",
+        description: "La nouvelle commande a été créée avec succès.",
+        variant: "default",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de créer la commande.",
+        variant: "destructive",
+      });
+    },
   });
 }
 
@@ -743,7 +872,7 @@ export function useResolveAlert() {
     onError: (error: any) => {
       toast({
         title: "Erreur",
-        description: error?.response?.data?.message || "Impossible de résoudre l'alerte.",
+        description: "Impossible de résoudre l'alerte.",
         variant: "destructive"
       });
     }
@@ -799,29 +928,6 @@ export function useOrders(params?: {
   });
 }
 
-export function useCreateOrder() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  
-  return useMutation({
-    mutationFn: (data: any) => apiService.post('/orders/orders/', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast({
-        title: "Commande créée",
-        description: "La nouvelle commande a été enregistrée avec succès."
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erreur",
-        description: error?.response?.data?.message || "Impossible de créer la commande.",
-        variant: "destructive"
-      });
-    }
-  });
-}
 
 export function useUpdateOrderStatus() {
   const queryClient = useQueryClient();
@@ -1390,6 +1496,29 @@ export function useCreateBackup() {
       toast({
         title: "Erreur",
         description: error?.response?.data?.message || "Impossible de créer la sauvegarde.",
+        variant: "destructive"
+      });
+    }
+  });
+}
+
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  return useMutation({
+    mutationFn: (userId: string) => apiService.delete(`/accounts/users/${userId}/`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast({
+        title: "Utilisateur supprimé",
+        description: "L'utilisateur a été supprimé avec succès"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error?.response?.data?.message || "Impossible de supprimer l'utilisateur.",
         variant: "destructive"
       });
     }

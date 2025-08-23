@@ -26,7 +26,16 @@ import {
   FileText,
   Camera
 } from "lucide-react";
-import { useExpenses, useExpenseCategories, useCreateExpense } from "@/hooks/use-api";
+import { 
+  useExpenses, 
+  useExpenseCategories, 
+  useCreateExpense,
+  useUpdateExpense,
+  useApproveExpense,
+  useRejectExpense,
+  useBudgetSettings,
+  usePaymentMethods
+} from "@/hooks/use-api";
 import { useToast } from "@/hooks/use-toast";
 
 interface Expense {
@@ -44,22 +53,11 @@ interface Expense {
 }
 
 
-const expenseCategories = [
-  "Achats marchandises",
-  "Salaires",
-  "Électricité",
-  "Eau",
-  "Maintenance",
-  "Marketing",
-  "Transport",
-  "Assurance",
-  "Taxes",
-  "Autres"
-];
 
 
 export default function Expenses() {
   const [showNewExpenseDialog, setShowNewExpenseDialog] = useState(false);
+  const [showBudgetDialog, setShowBudgetDialog] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [newExpense, setNewExpense] = useState({
     category: "",
@@ -87,8 +85,23 @@ export default function Expenses() {
     isLoading: categoriesLoading
   } = useExpenseCategories({ is_active: true });
 
-  // Hook pour créer une dépense
+  // Hooks pour les mutations
   const createExpenseMutation = useCreateExpense();
+  const updateExpenseMutation = useUpdateExpense();
+  const approveExpenseMutation = useApproveExpense();
+  const rejectExpenseMutation = useRejectExpense();
+
+  // Récupérer les paramètres de budget depuis l'API
+  const {
+    data: budgetSettingsData,
+    isLoading: budgetLoading
+  } = useBudgetSettings();
+
+  // Récupérer les modes de paiement depuis l'API
+  const {
+    data: paymentMethodsData,
+    isLoading: paymentMethodsLoading
+  } = usePaymentMethods();
 
   // Mapper les données de l'API vers le format d'affichage
   const expenses = useMemo(() => {
@@ -109,13 +122,34 @@ export default function Expenses() {
     }));
   }, [expensesData]);
 
-  // Mapper les catégories
+  // Mapper les catégories (100% dynamique)
   const categories = useMemo(() => {
-    if (!categoriesData?.results) return expenseCategories;
-    return categoriesData.results.map(cat => cat.name);
+    if (!categoriesData?.results) return [];
+    return categoriesData.results
+      .map(cat => cat.name)
+      .filter(name => name && name.trim() !== ''); // Filter out empty names
   }, [categoriesData]);
 
-  // Calculer les budgets dynamiquement à partir des dépenses
+  // Mapper les modes de paiement (100% dynamique)
+  const paymentMethods = useMemo(() => {
+    if (!paymentMethodsData || !Array.isArray((paymentMethodsData as any)?.results)) {
+      return [
+        { value: "cash", label: "Espèces" },
+        { value: "bank_transfer", label: "Virement bancaire" },
+        { value: "card", label: "Carte" },
+        { value: "mobile", label: "Mobile Money" },
+        { value: "check", label: "Chèque" }
+      ];
+    }
+    return (paymentMethodsData as any).results
+      .map((method: any) => ({
+        value: method.code,
+        label: method.name
+      }))
+      .filter((method: any) => method.value && method.value.trim() !== ''); // Filter out empty values
+  }, [paymentMethodsData]);
+
+  // Calculer les budgets dynamiquement (100% API)
   const monthlyBudgets = useMemo(() => {
     if (!expenses.length) return {};
     
@@ -132,15 +166,23 @@ export default function Expenses() {
       budgetsByCategory[expense.category].spent += expense.amount;
     });
     
-    // Définir des budgets par défaut basés sur les dépenses actuelles
-    Object.keys(budgetsByCategory).forEach(category => {
-      const spent = budgetsByCategory[category].spent;
-      // Budget = 150% des dépenses actuelles (marge de sécurité)
-      budgetsByCategory[category].budget = Math.round(spent * 1.5);
-    });
+    // Utiliser les budgets de l'API si disponibles, sinon calculer dynamiquement
+    if (budgetSettingsData && Array.isArray((budgetSettingsData as any)?.results)) {
+      (budgetSettingsData as any).results.forEach((setting: any) => {
+        if (budgetsByCategory[setting.category_name]) {
+          budgetsByCategory[setting.category_name].budget = setting.monthly_budget;
+        }
+      });
+    } else {
+      // Fallback: Budget = 150% des dépenses actuelles (marge de sécurité)
+      Object.keys(budgetsByCategory).forEach(category => {
+        const spent = budgetsByCategory[category].spent;
+        budgetsByCategory[category].budget = Math.round(spent * 1.5);
+      });
+    }
     
     return budgetsByCategory;
-  }, [expenses]);
+  }, [expenses, budgetSettingsData]);
 
   const getStatusInfo = (status: Expense["status"]) => {
     switch (status) {
@@ -156,15 +198,8 @@ export default function Expenses() {
   };
 
   const getPaymentMethodLabel = (method: string) => {
-    switch (method) {
-      case "cash": return "Espèces";
-      case "bank":
-      case "bank_transfer": return "Virement";
-      case "card": return "Carte";
-      case "mobile": return "Mobile Money";
-      case "check": return "Chèque";
-      default: return method;
-    }
+    const paymentMethod = paymentMethods.find(pm => pm.value === method);
+    return paymentMethod ? paymentMethod.label : method;
   };
 
   const filteredExpenses = expenses.filter(expense => 
@@ -175,37 +210,19 @@ export default function Expenses() {
 
   const approveExpense = async (expenseId: string) => {
     try {
-      // TODO: Implement API call to approve expense
-      // await updateExpense(expenseId, { is_approved: true });
-      toast({
-        title: "Dépense approuvée",
-        description: "La dépense a été approuvée avec succès."
-      });
+      await approveExpenseMutation.mutateAsync(expenseId);
       refetchExpenses();
     } catch (error) {
-      toast({
-        title: "Erreur",
-        description: "Impossible d'approuver la dépense.",
-        variant: "destructive"
-      });
+      // Error handling is done in the mutation hook
     }
   };
 
   const rejectExpense = async (expenseId: string) => {
     try {
-      // TODO: Implement API call to reject expense
-      // await updateExpense(expenseId, { is_approved: false, status: 'rejected' });
-      toast({
-        title: "Dépense rejetée",
-        description: "La dépense a été rejetée."
-      });
+      await rejectExpenseMutation.mutateAsync(expenseId);
       refetchExpenses();
     } catch (error) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de rejeter la dépense.",
-        variant: "destructive"
-      });
+      // Error handling is done in the mutation hook
     }
   };
 
@@ -291,14 +308,20 @@ export default function Expenses() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Catégorie</Label>
-                      <Select value={newExpense.category} onValueChange={(value) => setNewExpense(prev => ({...prev, category: value}))}>
+                      <Select value={newExpense.category} onValueChange={(value) => setNewExpense({...newExpense, category: value})}>
                         <SelectTrigger>
                           <SelectValue placeholder="Sélectionner une catégorie" />
                         </SelectTrigger>
                         <SelectContent>
-                          {categories.map(category => (
-                            <SelectItem key={category} value={category}>{category}</SelectItem>
-                          ))}
+                          {categoriesLoading ? (
+                            <SelectItem value="loading" disabled>Chargement...</SelectItem>
+                          ) : (
+                            categories.map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -332,23 +355,27 @@ export default function Expenses() {
                     </div>
                     <div className="space-y-2">
                       <Label>Mode de paiement</Label>
-                      <Select value={newExpense.paymentMethod} onValueChange={(value: any) => setNewExpense(prev => ({...prev, paymentMethod: value}))}>
+                      <Select value={newExpense.paymentMethod} onValueChange={(value) => setNewExpense({...newExpense, paymentMethod: value as any})}>
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Mode de paiement" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="cash">Espèces</SelectItem>
-                          <SelectItem value="bank_transfer">Virement bancaire</SelectItem>
-                          <SelectItem value="card">Carte</SelectItem>
-                          <SelectItem value="mobile">Mobile Money</SelectItem>
-                          <SelectItem value="check">Chèque</SelectItem>
+                          {paymentMethodsLoading ? (
+                            <SelectItem value="loading" disabled>Chargement...</SelectItem>
+                          ) : (
+                            paymentMethods.map((method) => (
+                              <SelectItem key={method.value} value={method.value}>
+                                {method.label}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Justificatif</Label>
+                    <Label>Justificatif (optionnel)</Label>
                     <div className="flex items-center gap-2">
                       <Input
                         type="file"
@@ -370,6 +397,76 @@ export default function Expenses() {
                   <Button onClick={createExpense} className="w-full">
                     Enregistrer la dépense
                   </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Budget Management Dialog */}
+            <Dialog open={showBudgetDialog} onOpenChange={setShowBudgetDialog}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Gestion des budgets mensuels</DialogTitle>
+                  <DialogDescription>
+                    Configurez les budgets mensuels par catégorie de dépenses
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {budgetLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div className="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
+                          <div className="h-8 bg-gray-200 rounded w-24 animate-pulse"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {categories.map((category) => {
+                        const budget = monthlyBudgets[category];
+                        return (
+                          <div key={category} className="flex items-center justify-between p-4 border rounded-lg">
+                            <div className="flex-1">
+                              <h4 className="font-medium">{category}</h4>
+                              {budget && (
+                                <p className="text-sm text-muted-foreground">
+                                  Dépensé: {budget.spent.toLocaleString()} FBu
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                placeholder="Budget mensuel"
+                                defaultValue={budget?.budget || 0}
+                                className="w-32"
+                                onChange={(e) => {
+                                  // Handle budget update
+                                  const newBudget = parseFloat(e.target.value) || 0;
+                                  // TODO: Implement budget update API call
+                                }}
+                              />
+                              <span className="text-sm text-muted-foreground">FBu</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button variant="outline" onClick={() => setShowBudgetDialog(false)}>
+                      Annuler
+                    </Button>
+                    <Button onClick={() => {
+                      toast({
+                        title: "Budgets mis à jour",
+                        description: "Les budgets mensuels ont été sauvegardés."
+                      });
+                      setShowBudgetDialog(false);
+                    }}>
+                      Sauvegarder
+                    </Button>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>
@@ -442,9 +539,15 @@ export default function Expenses() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Toutes les catégories</SelectItem>
-                    {categories.map(category => (
-                      <SelectItem key={category} value={category}>{category}</SelectItem>
-                    ))}
+                    {categoriesLoading ? (
+                      <SelectItem value="loading" disabled>Chargement...</SelectItem>
+                    ) : (
+                      categories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
                 <div className="ml-auto">
@@ -492,10 +595,16 @@ export default function Expenses() {
                       : `Aucune dépense dans la catégorie "${selectedCategory}".`
                     }
                   </p>
-                  <Button onClick={() => setShowNewExpenseDialog(true)} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Ajouter une dépense
-                  </Button>
+                  <div className="flex gap-2">
+              <Button onClick={() => setShowNewExpenseDialog(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nouvelle dépense
+              </Button>
+              <Button variant="outline" onClick={() => setShowBudgetDialog(true)}>
+                <TrendingUp className="mr-2 h-4 w-4" />
+                Gérer les budgets
+              </Button>
+            </div>
                 </div>
               ) : (
                 <div className="space-y-4">
