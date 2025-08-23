@@ -24,6 +24,26 @@ class IngredientSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['date_maj', 'created_at']
 
+    def to_representation(self, instance):
+        """Personnaliser la représentation pour formater les nombres"""
+        data = super().to_representation(instance)
+        
+        # Formater les champs décimaux pour éviter les .000 inutiles
+        if 'quantite_restante' in data and data['quantite_restante'] is not None:
+            # Convertir en float puis formater
+            val = float(data['quantite_restante'])
+            data['quantite_restante'] = int(val) if val.is_integer() else val
+            
+        if 'seuil_alerte' in data and data['seuil_alerte'] is not None:
+            val = float(data['seuil_alerte'])
+            data['seuil_alerte'] = int(val) if val.is_integer() else val
+            
+        if 'prix_unitaire' in data and data['prix_unitaire'] is not None:
+            val = float(data['prix_unitaire'])
+            data['prix_unitaire'] = int(val) if val.is_integer() else val
+            
+        return data
+
 
 class IngredientListSerializer(serializers.ModelSerializer):
     """Serializer simplifié pour la liste des ingrédients"""
@@ -47,6 +67,25 @@ class IngredientListSerializer(serializers.ModelSerializer):
             return 'alerte'
         else:
             return 'ok'
+
+    def to_representation(self, instance):
+        """Personnaliser la représentation pour formater les nombres"""
+        data = super().to_representation(instance)
+        
+        # Formater les champs décimaux pour éviter les .000 inutiles
+        if 'quantite_restante' in data and data['quantite_restante'] is not None:
+            val = float(data['quantite_restante'])
+            data['quantite_restante'] = int(val) if val.is_integer() else val
+            
+        if 'seuil_alerte' in data and data['seuil_alerte'] is not None:
+            val = float(data['seuil_alerte'])
+            data['seuil_alerte'] = int(val) if val.is_integer() else val
+            
+        if 'prix_unitaire' in data and data['prix_unitaire'] is not None:
+            val = float(data['prix_unitaire'])
+            data['prix_unitaire'] = int(val) if val.is_integer() else val
+            
+        return data
 
 
 class IngredientMovementSerializer(serializers.ModelSerializer):

@@ -28,6 +28,7 @@ import {
   Trash2
 } from "lucide-react";
 import { useKitchenDashboard, useIngredients, useCreateIngredient, useSuppliers } from "@/hooks/use-api";
+import { formatNumber, formatQuantity, formatUnitPrice } from "@/utils/formatters";
 
 interface StockAlert {
   ingredient: string;
@@ -83,7 +84,7 @@ export default function Kitchen() {
 
   // Calculer les statistiques réelles à partir des ingrédients
   const realStats = React.useMemo(() => {
-    if (!ingredientsData?.results) {
+    if (!ingredientsData || !Array.isArray((ingredientsData as any)?.results)) {
       return {
         critical_alerts: 0,
         warning_alerts: 0,
@@ -94,7 +95,7 @@ export default function Kitchen() {
       };
     }
 
-    const ingredients = ingredientsData.results;
+    const ingredients = (ingredientsData as any).results;
     let critical_alerts = 0;
     let warning_alerts = 0;
     let total_stock_value = 0;
@@ -255,7 +256,10 @@ export default function Kitchen() {
             <div className="text-center">
               <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
               <p>Erreur de chargement des données</p>
-              <Button onClick={fetchKitchenData} className="mt-4">
+              <Button onClick={() => {
+                refetchKitchen();
+                refetchIngredients();
+              }} className="mt-4">
                 Réessayer
               </Button>
             </div>
@@ -520,9 +524,9 @@ export default function Kitchen() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {ingredientsData?.results ? (
+                    {(ingredientsData as any)?.results ? (
                       <div className="space-y-4">
-                        {ingredientsData.results.map((ingredient: any) => (
+                        {(ingredientsData as any)?.results?.map((ingredient: any) => (
                           <div key={ingredient.id} className="flex items-center justify-between p-4 border rounded-lg">
                             <div className="flex items-center gap-4">
                               <div className="h-12 w-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
@@ -531,9 +535,9 @@ export default function Kitchen() {
                               <div>
                                 <h3 className="font-semibold">{ingredient.nom}</h3>
                                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                  <span>Stock: {ingredient.quantite_restante} {ingredient.unite}</span>
-                                  <span>Seuil: {ingredient.seuil_alerte} {ingredient.unite}</span>
-                                  <span>Prix: {ingredient.prix_unitaire} BIF/{ingredient.unite}</span>
+                                  <span>Stock: {formatQuantity(ingredient.quantite_restante, ingredient.unite)}</span>
+                                  <span>Seuil: {formatQuantity(ingredient.seuil_alerte, ingredient.unite)}</span>
+                                  <span>Prix: {formatUnitPrice(ingredient.prix_unitaire, ingredient.unite)}</span>
                                 </div>
                               </div>
                             </div>
@@ -556,7 +560,7 @@ export default function Kitchen() {
                           </div>
                         ))}
 
-                        {ingredientsData.results.length === 0 && (
+                        {(ingredientsData as any)?.results?.length === 0 && (
                           <div className="text-center py-8">
                             <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                             <p className="text-muted-foreground">Aucun ingrédient trouvé</p>
@@ -599,7 +603,7 @@ export default function Kitchen() {
                               <div>
                                 <h4 className="font-medium">{alert.ingredient}</h4>
                                 <p className="text-sm text-muted-foreground">
-                                  {alert.message}
+                                  Stock: {formatQuantity(alert.current_stock, alert.unit)} / Seuil: {formatQuantity(alert.threshold, alert.unit)}
                                 </p>
                               </div>
                             </div>
@@ -608,7 +612,7 @@ export default function Kitchen() {
                                 {alert.type === 'critical' ? 'Critique' : 'Attention'}
                               </Badge>
                               <p className="text-xs text-muted-foreground mt-1">
-                                Seuil: {alert.threshold} {alert.unit}
+                                Seuil: {formatQuantity(alert.threshold, alert.unit)}
                               </p>
                             </div>
                           </div>
@@ -630,7 +634,7 @@ export default function Kitchen() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {(kitchenData?.production_forecast || []).map((forecast, index) => (
+                      {((kitchenData as any)?.production_forecast || []).map((forecast: any, index: number) => (
                         <div key={index} className="p-4 border rounded-lg">
                           <div className="flex items-center justify-between mb-3">
                             <h4 className="font-semibold text-lg">{forecast.recipe}</h4>
@@ -679,7 +683,7 @@ export default function Kitchen() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {(kitchenData?.profitability_analysis || []).slice(0, 10).map((item, index) => (
+                      {((kitchenData as any)?.profitability_analysis || []).slice(0, 10).map((item: any, index: number) => (
                         <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
                           <div>
                             <h4 className="font-medium">{item.item}</h4>
@@ -738,10 +742,10 @@ export default function Kitchen() {
                             </div>
                             <div className="text-right">
                               <p className="font-medium">
-                                {item.needed_quantity} {item.unit}
+                                {formatQuantity(item.needed_quantity, item.unit)}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                ~{item.estimated_cost.toLocaleString()} BIF
+                                ~{formatNumber(item.estimated_cost).toLocaleString()} BIF
                               </p>
                             </div>
                           </div>
