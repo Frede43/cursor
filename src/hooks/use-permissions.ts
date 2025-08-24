@@ -1,39 +1,71 @@
-import { useQuery } from '@tanstack/react-query';
-import { apiService } from '@/services/api';
-import { useToast } from '@/hooks/use-toast';
+import { useAuth } from './use-auth';
 
-interface UserPermissions {
-  role: string;
-  permissions: {
-    [key: string]: boolean;
+// Définition des permissions par rôle
+const ROLE_PERMISSIONS = {
+  admin: [
+    'dashboard', 'profile', 'products', 'sales', 'kitchen', 
+    'stocks', 'stock-sync', 'supplies', 'sales-history', 
+    'daily-report', 'settings', 'users', 'tables', 'orders'
+  ],
+  manager: [
+    'dashboard', 'profile', 'products', 'sales', 'kitchen', 
+    'stocks', 'stock-sync', 'supplies', 'sales-history', 
+    'daily-report', 'tables', 'orders'
+  ],
+  cashier: [
+    'dashboard', 'profile', 'sales', 'sales-history', 
+    'tables', 'orders'
+  ],
+  server: [
+    'dashboard', 'profile', 'sales', 'tables', 'orders'
+  ]
+};
+
+/**
+ * Hook pour gérer les permissions et l'accès aux menus
+ */
+export const usePermissions = () => {
+  const { user, hasRole } = useAuth();
+  
+  // Déterminer les menus accessibles en fonction du rôle
+  const getAccessibleMenus = () => {
+    if (!user) return [];
+    
+    // Si l'utilisateur est superuser, il a accès à tout
+    if (user.is_superuser) {
+      return Object.values(ROLE_PERMISSIONS).flat();
+    }
+    
+    // Vérifier le rôle de l'utilisateur
+    for (const [role, permissions] of Object.entries(ROLE_PERMISSIONS)) {
+      if (hasRole(role)) {
+        return permissions;
+      }
+    }
+    
+    // Par défaut, accès minimal
+    return ['dashboard', 'profile'];
   };
-}
-
-/**
- * Hook pour récupérer et vérifier les permissions de l'utilisateur connecté
- */
-export function useUserPermissions() {
-  return useQuery<UserPermissions>({
-    queryKey: ['user-permissions'],
-    queryFn: () => apiService.get('/accounts/permissions/'),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-}
-
-/**
- * Hook pour vérifier si l'utilisateur a une permission spécifique
- */
-export function useHasPermission(permissionCode: string) {
-  const { data: permissions } = useUserPermissions();
   
-  // Les admins ont toutes les permissions
-  if (permissions?.role === 'admin') {
-    return true;
-  }
+  // Vérifier si l'utilisateur peut accéder à un menu spécifique
+  const canAccessMenu = (menuKey: string) => {
+    if (!user) return false;
+    
+    // Si l'utilisateur est superuser, il a accès à tout
+    if (user.is_superuser) return true;
+    
+    // Vérifier si le menu est dans les permissions du rôle
+    return getAccessibleMenus().includes(menuKey);
+  };
   
-  // Vérifier la permission spécifique
-  return permissions?.permissions?.[permissionCode] || false;
-}
+  // Récupérer les menus accessibles
+  const accessibleMenus = getAccessibleMenus();
+  
+  return {
+    canAccessMenu,
+    accessibleMenus
+  };
+};
 
 /**
  * Hook pour vérifier plusieurs permissions
@@ -44,6 +76,20 @@ export function useHasAnyPermission(permissionCodes: string[]) {
   // Les admins ont toutes les permissions
   if (permissions?.role === 'admin') {
     return true;
+  }
+  
+  // Permissions spécifiques pour le caissier
+  if (permissions?.role === 'cashier') {
+    const cashierPermissions = [
+      'dashboard.view',
+      'sales.view', 
+      'sales.create',
+      'finances.history',
+      'products.view',
+      'tables.view',
+      'orders.view'
+    ];
+    return permissionCodes.some(code => cashierPermissions.includes(code));
   }
   
   // Vérifier si l'utilisateur a au moins une des permissions
@@ -137,11 +183,23 @@ export const MENU_PERMISSIONS = {
  * Hook pour vérifier si un menu est accessible
  */
 export function useCanAccessMenu(menuKey: keyof typeof MENU_PERMISSIONS) {
+  const { data: permissions } = useUserPermissions();
   const requiredPermissions = MENU_PERMISSIONS[menuKey];
   
   // Si aucune permission requise, accessible à tous
   if (requiredPermissions.length === 0) {
     return true;
+  }
+  
+  // Les admins ont accès à tout
+  if (permissions?.role === 'admin') {
+    return true;
+  }
+  
+  // Permissions spécifiques pour le caissier
+  if (permissions?.role === 'cashier') {
+    const cashierMenus = ['dashboard', 'sales', 'sales-history', 'products', 'tables', 'orders', 'profile'];
+    return cashierMenus.includes(menuKey);
   }
   
   return useHasAnyPermission([...requiredPermissions]);
@@ -156,16 +214,21 @@ export function useAccessibleMenus() {
   const getAccessibleMenus = () => {
     if (isLoading || !permissions) return [];
     
+    // Les admins ont accès à tout
+    if (permissions.role === 'admin') {
+      return Object.keys(MENU_PERMISSIONS);
+    }
+    
+    // Menus spécifiques pour le caissier
+    if (permissions.role === 'cashier') {
+      return ['dashboard', 'sales', 'sales-history', 'products', 'tables', 'orders', 'profile'];
+    }
+    
     return Object.keys(MENU_PERMISSIONS).filter(menuKey => {
       const requiredPermissions = MENU_PERMISSIONS[menuKey as keyof typeof MENU_PERMISSIONS];
       
       // Si aucune permission requise, accessible à tous
       if (requiredPermissions.length === 0) {
-        return true;
-      }
-      
-      // Les admins ont accès à tout
-      if (permissions.role === 'admin') {
         return true;
       }
       

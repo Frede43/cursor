@@ -347,14 +347,14 @@ export default function Users() {
                   Nouvel utilisateur
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg">
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Créer un nouvel utilisateur</DialogTitle>
                   <DialogDescription>
                     Ajoutez un nouveau membre à votre équipe
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="space-y-1">
                     <Label htmlFor="username" className="text-sm">Nom d'utilisateur</Label>
                     <Input
@@ -430,7 +430,7 @@ export default function Users() {
                       <p className="text-xs text-muted-foreground">Chargement...</p>
                     ) : (
                       <div className="border border-gray-200 rounded p-2 bg-gray-50">
-                        <div className="max-h-48 overflow-y-auto pr-2">
+                        <div className="max-h-60 overflow-y-auto pr-2">
                           {Array.isArray(permissionsData) && permissionsData.length > 0 ? (
                             <>
                               {/* Grouper les permissions par catégorie */}
@@ -778,7 +778,7 @@ export default function Users() {
 
           {/* Dialog pour modifier un utilisateur */}
           <Dialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog}>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Modifier l'utilisateur</DialogTitle>
                 <DialogDescription>
@@ -786,7 +786,7 @@ export default function Users() {
                 </DialogDescription>
               </DialogHeader>
               {editingUser && (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label htmlFor="edit_first_name" className="text-sm">Prénom</Label>
@@ -866,7 +866,7 @@ export default function Users() {
                       <p className="text-xs text-muted-foreground">Chargement...</p>
                     ) : (
                       <div className="border border-gray-200 rounded p-2 bg-gray-50">
-                        <div className="max-h-48 overflow-y-auto pr-2">
+                        <div className="max-h-60 overflow-y-auto pr-2">
                           {Array.isArray(permissionsData) && permissionsData.length > 0 ? (
                             <>
                               {/* Grouper les permissions par catégorie */}

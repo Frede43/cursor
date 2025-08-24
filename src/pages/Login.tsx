@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,11 +14,12 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
-  const { login, user, isLoading } = useAuth();
+  const { login, user, isLoading, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   
   // Rediriger vers le tableau de bord si déjà connecté
   useEffect(() => {
-    if (user && user.isLoggedIn) {
+    if (user) {
       navigate('/');
     }
   }, [user, navigate]);
@@ -25,12 +27,36 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Utiliser la fonction login du hook useAuth
-    const success = await login(username, password);
+    // Vérifier que les champs ne sont pas vides
+    if (!username || !password) {
+      toast({
+        title: "Erreur de connexion",
+        description: "Veuillez saisir un nom d'utilisateur et un mot de passe",
+        variant: "destructive",
+      });
+      return;
+    }
     
-    // Si la connexion réussit, l'utilisateur sera redirigé dans le hook useAuth
-    if (success) {
-      navigate('/');
+    // Connexion directe pour admin/admin123 (mode développement)
+    if (username === "admin" && password === "admin123") {
+      // Utiliser le hook login pour une connexion cohérente
+      const success = await login({ username: "admin", password: "admin123" });
+      if (success) {
+        navigate('/', { replace: true });
+      }
+      return;
+    }
+    
+    try {
+      // Utiliser la fonction login du hook useAuth
+      const success = await login({ username, password });
+      
+      // Redirection immédiate si la connexion réussit
+      if (success) {
+        navigate('/', { replace: true });
+      }
+    } catch (error: any) {
+      console.error("Erreur de connexion:", error);
     }
   };
 

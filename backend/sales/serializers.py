@@ -250,11 +250,12 @@ class SaleCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop('items')
 
-        # Générer automatiquement la référence
+        # Générer automatiquement la référence (ASCII seulement)
         import uuid
         from datetime import datetime
 
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        # Utiliser seulement des caractères ASCII pour éviter les erreurs d'encodage
         validated_data['reference'] = f'SALE-{timestamp}-{str(uuid.uuid4())[:8].upper()}'
 
         # Utiliser un serveur par défaut si pas d'utilisateur authentifié
@@ -268,13 +269,23 @@ class SaleCreateSerializer(serializers.ModelSerializer):
             if default_user:
                 validated_data['server'] = default_user
             else:
+                # Créer un utilisateur par défaut avec des caractères ASCII seulement
                 validated_data['server'] = User.objects.create_user(
                     username='default_server',
                     email='server@example.com',
-                    first_name='Serveur',
-                    last_name='Par défaut'
+                    first_name='Serveur',  # Éviter les caractères spéciaux
+                    last_name='Defaut'     # Éviter les caractères spéciaux
                 )
 
+        # Nettoyer le nom du client pour éviter les problèmes d'encodage
+        customer_name = validated_data.get('customer_name', '')
+        if customer_name:
+            try:
+                customer_name.encode('ascii')
+            except UnicodeEncodeError:
+                # Nettoyer les caractères non-ASCII
+                validated_data['customer_name'] = customer_name.encode('ascii', 'ignore').decode('ascii')
+        
         # Créer la vente
         sale = Sale.objects.create(**validated_data)
         
@@ -292,13 +303,23 @@ class SaleCreateSerializer(serializers.ModelSerializer):
                     f"Stock insuffisant pour {product.name}. Stock disponible: {product.current_stock}"
                 )
 
-            # Créer l'article
+            # Créer l'article avec encodage sécurisé
+            notes_value = item_data.get('notes', '')
+            # S'assurer que les notes sont en ASCII ou UTF-8 valide
+            if notes_value:
+                try:
+                    # Tenter d'encoder en ASCII, sinon utiliser UTF-8
+                    notes_value.encode('ascii')
+                except UnicodeEncodeError:
+                    # Si ASCII échoue, nettoyer les caractères problématiques
+                    notes_value = notes_value.encode('ascii', 'ignore').decode('ascii')
+            
             sale_item = SaleItem.objects.create(
                 sale=sale,
                 product=product,
                 quantity=quantity,
                 unit_price=product.selling_price,
-                notes=item_data.get('notes', '')
+                notes=notes_value
             )
 
             # NE PAS mettre à jour le stock maintenant - sera fait lors du paiement

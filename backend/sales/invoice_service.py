@@ -19,11 +19,11 @@ class InvoiceService:
         
         # Informations de l'entreprise (à personnaliser selon le restaurant)
         company_info = {
-            'name': getattr(settings, 'RESTAURANT_NAME', 'Bar Stock Wise'),
+            'name': getattr(settings, 'RESTAURANT_NAME', "Harry's Grill"),
             'address': getattr(settings, 'RESTAURANT_ADDRESS', 'Bujumbura, Burundi'),
-            'phone': getattr(settings, 'RESTAURANT_PHONE', '+257 XX XX XX XX'),
+            'phone': getattr(settings, 'RESTAURANT_PHONE', '+257 62 12 45 10 /79 932 322'),
             'email': 'contact@barstockwise.bi',
-            'tax_number': 'NIF: 4000123456',  # Numéro d'Identification Fiscale Burundi
+            'tax_number': 'NIF: 4002843516',  # Numéro d'Identification Fiscale Burundi
             'logo_url': '/static/images/logo.png',  # Logo du restaurant
             'website': 'www.barstockwise.bi'
         }
@@ -33,6 +33,8 @@ class InvoiceService:
             'name': sale.customer_name or 'Client',
             'table': f"Table {sale.table.number}" if sale.table else 'À emporter',
             'table_location': sale.table.location if sale.table and sale.table.location else '',
+            'table_capacity': sale.table.capacity if sale.table else None,
+            'table_status': sale.table.get_status_display() if sale.table else None,
             'date': sale.created_at.strftime('%d/%m/%Y'),
             'time': sale.created_at.strftime('%H:%M'),
             'datetime_full': sale.created_at.strftime('%d/%m/%Y à %H:%M'),
@@ -181,8 +183,9 @@ class InvoiceService:
                 <div class="customer-info">
                     <div class="section-title">Informations Client</div>
                     <strong>{{ customer.name }}</strong><br>
-                    {{ customer.table }}<br>
-                    Serveur: {{ server }}
+                    {{ customer.table }}{% if customer.table_location %} ({{ customer.table_location }}){% endif %}<br>
+                    {% if customer.table_capacity %}Capacité: {{ customer.table_capacity }} personnes<br>{% endif %}
+                    Serveur: {{ server.name }}
                 </div>
                 <div class="invoice-details">
                     <div class="section-title">Détails Facture</div>

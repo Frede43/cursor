@@ -270,14 +270,14 @@ CUSTOM_SMS_API_URL = 'https://your-local-sms-provider.com/api/send'
 CUSTOM_SMS_API_KEY = 'your-api-key'
 
 # ===== RESTAURANT CONFIGURATION =====
-RESTAURANT_NAME = 'BarStockWise'
-RESTAURANT_PHONE = '+257 XX XX XX XX'  # À configurer avec votre numéro
+RESTAURANT_NAME = "Harry's Grill"
+RESTAURANT_PHONE = '+257 62 12 45 10 /79 932 322'  # À configurer avec votre numéro
 RESTAURANT_ADDRESS = 'Votre adresse complète, Bujumbura, Burundi'
 
 # Numéros de téléphone du personnel pour les notifications
 STAFF_PHONE_NUMBERS = [
-    '+257 XX XX XX XX',  # Manager
-    '+257 XX XX XX XX',  # Chef de service
+    '+257 62 12 45 10 /79 932 322',  # Manager
+    '+257 62 12 45 10 /79 932 322',  # Chef de service
     # Ajouter d'autres numéros selon besoin
 ]
 
