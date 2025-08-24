@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,27 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/use-auth";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { login, user, isLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
-  
-  // Rediriger vers le tableau de bord si déjà connecté
-  useEffect(() => {
-    if (user) {
-      navigate('/');
-    }
-  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Vérifier que les champs ne sont pas vides
     if (!username || !password) {
       toast({
         title: "Erreur de connexion",
@@ -37,27 +28,58 @@ export default function Login() {
       return;
     }
     
-    // Connexion directe pour admin/admin123 (mode développement)
-    if (username === "admin" && password === "admin123") {
-      // Utiliser le hook login pour une connexion cohérente
-      const success = await login({ username: "admin", password: "admin123" });
-      if (success) {
-        navigate('/', { replace: true });
-      }
-      return;
-    }
+    setIsLoading(true);
     
     try {
-      // Utiliser la fonction login du hook useAuth
-      const success = await login({ username, password });
-      
-      // Redirection immédiate si la connexion réussit
-      if (success) {
-        navigate('/', { replace: true });
+      // Connexion dynamique avec le backend
+      const response = await fetch('http://localhost:8000/api/accounts/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: username.toLowerCase().trim(),
+          password: password
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Stocker les tokens et informations utilisateur
+        localStorage.setItem('access_token', data.tokens.access);
+        localStorage.setItem('refresh_token', data.tokens.refresh);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        
+        toast({
+          title: "Connexion réussie",
+          description: `Bienvenue ${data.user.first_name || data.user.username}!`,
+        });
+        
+        // Redirection selon le rôle
+        if (data.user.role === 'cashier') {
+          navigate('/sales', { replace: true });
+        } else {
+          navigate('/', { replace: true });
+        }
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Erreur de connexion",
+          description: errorData.message || "Nom d'utilisateur ou mot de passe incorrect",
+          variant: "destructive",
+        });
       }
-    } catch (error: any) {
-      console.error("Erreur de connexion:", error);
+    } catch (error) {
+      console.error('Erreur de connexion:', error);
+      toast({
+        title: "Erreur de connexion",
+        description: "Impossible de se connecter au serveur. Vérifiez votre connexion.",
+        variant: "destructive",
+      });
     }
+    
+    setIsLoading(false);
   };
 
   return (
@@ -173,7 +195,7 @@ export default function Login() {
         {/* Footer */}
         <div className="text-center mt-6">
           <p className="text-sm text-primary-foreground/70">
-            © 2024 Bar Stock Wise. Système de gestion professionnel.
+            2024 Bar Stock Wise. Système de gestion professionnel.
           </p>
         </div>
       </div>

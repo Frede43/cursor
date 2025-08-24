@@ -170,7 +170,7 @@ def profile_view(request):
     Vue pour récupérer et mettre à jour le profil de l'utilisateur connecté
     """
     if request.method == 'GET':
-        serializer = UserProfileSerializer(request.user)
+        serializer = UserSerializer(request.user)
         return Response(serializer.data)
     
     elif request.method == 'PATCH':

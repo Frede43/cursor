@@ -6,7 +6,7 @@ import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
 import { UserRole } from '@/types/auth';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { Loader2 } from 'lucide-react';
 import { AccessDenied } from '@/components/auth/AccessDenied';
 
 interface ProtectedRouteProps {
@@ -39,11 +39,15 @@ export const ProtectedRoute = ({
 
   // Affichage du chargement
   if (isLoading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   // Redirection si non authentifié
-  if (!isAuthenticated || !user) {
+  if (!isAuthenticated) {
     return (
       <Navigate 
         to={fallbackPath} 

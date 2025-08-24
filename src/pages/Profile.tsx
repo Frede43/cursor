@@ -43,14 +43,25 @@ import {
   Eye,
   EyeOff
 } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
+// Removed useAuth import
 import { useUserActivities, useUpdateProfile, useChangePassword, useUpdatePreferences } from "@/hooks/use-api";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { apiService } from "@/services/api";
 
 export default function Profile() {
-  const { user } = useAuth();
+  // Mock user data (no auth system)
+  const user = {
+    id: 1,
+    username: 'admin',
+    first_name: 'Admin',
+    last_name: 'User',
+    email: 'admin@barstock.com',
+    phone: '+257 79 123 456',
+    role: 'admin',
+    is_superuser: true,
+    is_staff: true
+  };
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -72,7 +83,7 @@ export default function Profile() {
     data: activitiesData,
     isLoading: activitiesLoading,
     error: activitiesError
-  } = useUserActivities({ user: user?.id });
+  } = useUserActivities(user?.id);
 
   // Fetch current user profile from API
   const {
@@ -85,6 +96,14 @@ export default function Profile() {
     enabled: !!user?.id,
     staleTime: 0 // Toujours récupérer les données fraîches
   });
+
+  // Mock user activities data (no API call)
+  const userActivities = {
+    results: [
+      { timestamp: new Date().toISOString(), action: 'Login', description: 'User logged in' },
+      { timestamp: new Date(Date.now() - 86400000).toISOString(), action: 'Product Update', description: 'Updated product inventory' }
+    ]
+  };
 
   // Update profile when user data or profile data is available
   useEffect(() => {
@@ -111,7 +130,7 @@ export default function Profile() {
   });
 
   // Process activity history from API
-  const activityHistory = activitiesData?.results?.map((activity: any) => ({
+  const activityHistory = (userActivities as any)?.results?.map((activity: any) => ({
     date: new Date(activity.timestamp).toLocaleString('fr-FR'),
     action: activity.description || activity.action,
     type: activity.action.toLowerCase().includes('login') ? 'login' : 

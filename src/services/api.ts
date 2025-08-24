@@ -120,7 +120,7 @@ class ApiService {
     try {
       const response = await fetch(url, config);
 
-      // Gestion de l'expiration du token
+      // Handle token refresh for dynamic authentication
       if (response.status === 401 && this.refreshToken) {
         const refreshed = await this.refreshAccessToken();
         if (refreshed) {
@@ -165,12 +165,11 @@ class ApiService {
         throw new Error(`HTTP Error: ${response.status} - ${response.statusText}`);
       }
       
-      // Si erreur 401 (Non autorisé), forcer la déconnexion
+      // Handle auth errors for dynamic authentication
       if (response.status === 401) {
         this.handleAuthError();
+        throw new Error('Session expirée. Veuillez vous reconnecter.');
       }
-      
-      // Amélioration de la gestion des erreurs
       const errorMessage = errorData.message || errorData.detail || errorData.error || `HTTP Error: ${response.status}`;
       console.error('API Error:', errorData);
       throw new Error(errorMessage);
@@ -194,15 +193,18 @@ class ApiService {
     // Nettoyer le localStorage
     this.clearTokensFromStorage();
     
-    // Rediriger vers la page de connexion
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
+    // Pas de redirection automatique - laisser l'AuthProvider gérer
+    console.log('Session expirée - nettoyage des tokens effectué');
   }
 
   // Méthode pour définir les tokens
   setTokens(accessToken: string, refreshToken: string) {
     this.saveTokensToStorage({ access: accessToken, refresh: refreshToken });
+  }
+
+  // Méthode pour nettoyer les tokens
+  clearTokens() {
+    this.clearTokensFromStorage();
   }
 
   // Authentification
@@ -275,7 +277,7 @@ class ApiService {
   async getUserPermissions(): Promise<string[]> {
     try {
       const response = await this.get('/accounts/permissions/');
-      return response.permissions || [];
+      return (response as any).permissions || [];
     } catch (error) {
       console.error('Erreur lors de la récupération des permissions:', error);
       return [];

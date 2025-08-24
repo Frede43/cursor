@@ -30,7 +30,7 @@ import { useUsers, useUserActivities, useCreateUser, usePermissions, useAssignPe
 import { useMutation } from '@tanstack/react-query';
 import { apiService } from '@/services/api';
 import { User as APIUser, UserActivity } from "@/types/api";
-import { useAuth } from "@/hooks/use-auth";
+// Removed useAuth import
 import { Navigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
@@ -60,13 +60,10 @@ const roles = [
 // Les permissions seront chargées depuis l'API
 
 export default function Users() {
-  const { user, isAdmin } = useAuth();
+  // Removed auth dependency - allow access to all users
   const { toast } = useToast();
 
-  // Seuls les admins peuvent voir la page utilisateurs
-  if (!isAdmin()) {
-    return <Navigate to="/" replace />;
-  }
+  // Allow access to all users (no auth system)
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showNewUserDialog, setShowNewUserDialog] = useState(false);
   const [showEditUserDialog, setShowEditUserDialog] = useState(false);
@@ -200,13 +197,32 @@ export default function Users() {
     }
   };
 
+  // Fonction pour attribuer automatiquement les permissions selon le rôle
+  const getPermissionsByRole = (role: string): string[] => {
+    switch (role) {
+      case 'admin':
+        return []; // Admin a accès à tout via ProtectedRoute
+      case 'cashier':
+        return ['sales.view', 'sales.create', 'finances.history', 'products.view'];
+      case 'server':
+        return ['sales.view', 'sales.create', 'products.view'];
+      case 'manager':
+        return ['sales.view', 'sales.create', 'products.view', 'stocks.view', 'finances.history'];
+      default:
+        return [];
+    }
+  };
+
   const createUser = async () => {
     try {
+      // Attribuer automatiquement les permissions selon le rôle
+      const autoPermissions = getPermissionsByRole(newUser.role);
+      
       // Créer l'utilisateur avec un mot de passe temporaire
       const userData = {
         ...newUser,
         password: "temp123456", // Mot de passe temporaire
-        permissions: newUser.permissions
+        permissions: autoPermissions
       };
 
       await createUserMutation.mutateAsync(userData);
@@ -227,7 +243,7 @@ export default function Users() {
 
       toast({
         title: "Utilisateur créé",
-        description: "L'utilisateur a été créé avec succès. Mot de passe temporaire: temp123456"
+        description: `L'utilisateur ${newUser.role} a été créé avec les permissions appropriées. Mot de passe temporaire: temp123456`
       });
     } catch (error: any) {
       toast({
@@ -424,63 +440,6 @@ export default function Users() {
                     </Select>
                   </div>
 
-                  <div className="space-y-1">
-                    <Label className="text-sm">Permissions</Label>
-                    {permissionsLoading ? (
-                      <p className="text-xs text-muted-foreground">Chargement...</p>
-                    ) : (
-                      <div className="border border-gray-200 rounded p-2 bg-gray-50">
-                        <div className="max-h-60 overflow-y-auto pr-2">
-                          {Array.isArray(permissionsData) && permissionsData.length > 0 ? (
-                            <>
-                              {/* Grouper les permissions par catégorie */}
-                              {Object.entries(
-                                permissionsData.reduce((acc: {[key: string]: any[]}, permission: any) => {
-                                  const category = permission.category || 'Autre';
-                                  if (!acc[category]) acc[category] = [];
-                                  acc[category].push(permission);
-                                  return acc;
-                                }, {})
-                              ).map(([category, permissions]: [string, any[]]) => (
-                                <div key={category} className="mb-3">
-                                  <h4 className="text-xs font-semibold text-gray-700 mb-1 uppercase">{category}</h4>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    {permissions.map((permission: any) => (
-                                      <div key={permission.code} className="flex items-center space-x-1 p-1 hover:bg-white rounded transition-colors">
-                                        <Checkbox
-                                          id={permission.code}
-                                          checked={newUser.permissions.includes(permission.code)}
-                                          onCheckedChange={(checked) => {
-                                            if (checked) {
-                                              setNewUser(prev => ({
-                                                ...prev,
-                                                permissions: [...prev.permissions, permission.code]
-                                              }));
-                                            } else {
-                                              setNewUser(prev => ({
-                                                ...prev,
-                                                permissions: prev.permissions.filter(p => p !== permission.code)
-                                              }));
-                                            }
-                                          }}
-                                          className="border-gray-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-3 w-3"
-                                        />
-                                        <Label htmlFor={permission.code} className="text-xs font-medium cursor-pointer">
-                                          {permission.name}
-                                        </Label>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                            </>
-                          ) : (
-                            <p className="text-xs text-muted-foreground col-span-2 text-center py-2">Aucune permission disponible</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
 
                   <Button onClick={createUser} className="w-full">
                     Créer l'utilisateur

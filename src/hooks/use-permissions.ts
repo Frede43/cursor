@@ -1,6 +1,5 @@
-import { useAuth } from './use-auth';
+// Simplified permissions hook without auth dependency
 
-// Définition des permissions par rôle
 const ROLE_PERMISSIONS = {
   admin: [
     'dashboard', 'profile', 'products', 'sales', 'kitchen', 
@@ -21,24 +20,40 @@ const ROLE_PERMISSIONS = {
   ]
 };
 
+const menuItems = [
+  { path: '/', label: 'Tableau de bord', category: 'dashboard' },
+  { path: '/profile', label: 'Profil', category: 'profile' },
+  { path: '/products', label: 'Produits', category: 'products' },
+  { path: '/sales', label: 'Ventes', category: 'sales' },
+  { path: '/kitchen', label: 'Cuisine', category: 'kitchen' },
+  { path: '/stocks', label: 'Stocks', category: 'stocks' },
+  { path: '/stock-sync', label: 'Sync Stock', category: 'stocks' },
+  { path: '/supplies', label: 'Approvisionnement', category: 'supplies' },
+  { path: '/sales-history', label: 'Historique', category: 'sales' },
+  { path: '/daily-report', label: 'Rapport', category: 'reports' },
+  { path: '/settings', label: 'Paramètres', category: 'settings' },
+  { path: '/users', label: 'Utilisateurs', category: 'users' },
+  { path: '/tables', label: 'Tables', category: 'tables' },
+  { path: '/orders', label: 'Commandes', category: 'orders' }
+];
+
 /**
  * Hook pour gérer les permissions et l'accès aux menus
  */
 export const usePermissions = () => {
-  const { user, hasRole } = useAuth();
-  
+  // Return admin permissions by default (no auth system)
+  const userPermissions = ROLE_PERMISSIONS.admin;
+
   // Déterminer les menus accessibles en fonction du rôle
   const getAccessibleMenus = () => {
-    if (!user) return [];
-    
     // Si l'utilisateur est superuser, il a accès à tout
-    if (user.is_superuser) {
+    if (userPermissions.includes('superuser')) {
       return Object.values(ROLE_PERMISSIONS).flat();
     }
     
     // Vérifier le rôle de l'utilisateur
     for (const [role, permissions] of Object.entries(ROLE_PERMISSIONS)) {
-      if (hasRole(role)) {
+      if (userPermissions.includes(role)) {
         return permissions;
       }
     }

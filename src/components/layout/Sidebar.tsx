@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { usePermissions } from "@/hooks/use-permissions";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-auth-dynamic";
+// Removed useAuth import
 import {
   BarChart3,
   Package,
@@ -130,10 +130,29 @@ function MenuItemComponent({ item, isCollapsed, isActive }: {
   isCollapsed: boolean;
   isActive: boolean;
 }) {
-  const { canAccessMenu } = usePermissions();
+  const { user } = useAuth();
+  
+  // Fonction pour vérifier si l'utilisateur peut accéder à un menu
+  const canAccessMenu = (permissionKey: string): boolean => {
+    if (!user) return false;
+    
+    // Les admins ont accès à tout
+    if (user.role === 'admin') return true;
+    
+    // Mapping des permissions selon les rôles
+    const rolePermissions: Record<string, string[]> = {
+      cashier: ['sales', 'sales-history', 'profile'], // Pas d'accès au dashboard
+      server: ['dashboard', 'sales', 'products', 'profile'],
+      manager: ['dashboard', 'sales', 'products', 'stocks', 'sales-history', 'profile']
+    };
+    
+    const userPermissions = rolePermissions[user.role] || [];
+    return userPermissions.includes(permissionKey);
+  };
 
-  if (item.permissionKey && !canAccessMenu(item.permissionKey as any)) {
-    return null; // Ne pas afficher l'élément si l'utilisateur n'a pas les permissions
+  // Vérifier les permissions pour cet élément de menu
+  if (item.permissionKey && !canAccessMenu(item.permissionKey)) {
+    return null;
   }
 
   const Icon = item.icon;
@@ -182,8 +201,7 @@ export function Sidebar({ className }: SidebarProps = {}) {
     }), {})
   );
   const location = useLocation();
-  const { accessibleMenus } = usePermissions();
-  const { user, isLoading, userRole } = useAuth();
+  const { user } = useAuth();
 
   const toggleCategory = (categoryLabel: string) => {
     if (isCollapsed) return;
@@ -193,15 +211,26 @@ export function Sidebar({ className }: SidebarProps = {}) {
     }));
   };
 
-  // Filtrer les catégories pour ne montrer que celles avec des éléments accessibles
-  const getFilteredCategories = () => {
-    return menuCategories.map(category => ({
-      ...category,
-      items: category.items.filter(item =>
-        !item.permissionKey || accessibleMenus.includes(item.permissionKey)
-      )
-    })).filter(category => category.items.length > 0);
-  };
+  // Filtrer les catégories selon les permissions de l'utilisateur
+  const visibleCategories = menuCategories.map(category => ({
+    ...category,
+    items: category.items.filter(item => {
+      if (!user) return false;
+      
+      // Les admins ont accès à tout
+      if (user.role === 'admin') return true;
+      
+      // Mapping des permissions selon les rôles
+      const rolePermissions: Record<string, string[]> = {
+        cashier: ['sales', 'sales-history', 'profile'], // Pas d'accès au dashboard
+        server: ['dashboard', 'sales', 'products', 'profile'],
+        manager: ['dashboard', 'sales', 'products', 'stocks', 'sales-history', 'profile']
+      };
+      
+      const userPermissions = rolePermissions[user.role] || [];
+      return !item.permissionKey || userPermissions.includes(item.permissionKey);
+    })
+  })).filter(category => category.items.length > 0); // Supprimer les catégories vides
 
   return (
     <TooltipProvider>
@@ -229,21 +258,19 @@ export function Sidebar({ className }: SidebarProps = {}) {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {isLoading ? (
-          <div className="text-center text-primary-foreground/70 text-sm">
-            Chargement...
-          </div>
-        ) : (
+        {(
           <>
             {/* Affichage du rôle utilisateur */}
             {!isCollapsed && user && (
               <div className="mb-4 p-2 bg-primary-foreground/10 rounded-lg">
                 <p className="text-xs text-primary-foreground/70">Connecté en tant que:</p>
-                <p className="text-sm font-medium text-primary-foreground capitalize">{user.role}</p>
+                <p className="text-sm font-medium text-primary-foreground capitalize">
+                  {user.first_name} {user.last_name} ({user.role})
+                </p>
               </div>
             )}
 
-            {getFilteredCategories().map((category) => (
+            {visibleCategories.map((category) => (
           <div key={category.label} className="space-y-1">
             {/* Category Header */}
             {!isCollapsed && (

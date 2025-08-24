@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from './use-toast';
+import { roleHasPermission } from '@/config/permissions';
 
 // Constants pour la gestion de session
 const SESSION_DURATION = 60 * 60 * 1000; // 1 heure
@@ -55,33 +56,24 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Vérifier si l'utilisateur est déjà connecté au chargement
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        if (userData.isLoggedIn && !isSessionExpired(userData)) {
-          // Définir l'utilisateur immédiatement pour éviter le flash de login
-          setUser(userData);
-          setIsLoading(false);
-          
-          // Redirection forcée vers le tableau de bord si on est sur la page de login
-          if (window.location.pathname === '/login') {
-            window.location.href = '/';
+    const initAuth = () => {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          if (userData && userData.isLoggedIn) {
+            setUser(userData);
+          } else {
+            localStorage.removeItem('user');
           }
-        } else {
-          // Session expirée, nettoyer le localStorage
+        } catch (error) {
           localStorage.removeItem('user');
-          setIsLoading(false);
         }
-      } catch (error) {
-        console.error('Erreur lors de la récupération des données utilisateur:', error);
-        localStorage.removeItem('user');
-        setIsLoading(false);
       }
-    } else {
       setIsLoading(false);
-    }
+    };
+
+    initAuth();
   }, []);
 
   // Vérification périodique de l'activité et de la session
@@ -211,10 +203,16 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         };
 
         // Sauvegarder dans le localStorage
-        localStorage.setItem('user', JSON.stringify(adminUser));
+        try {
+          localStorage.setItem('user', JSON.stringify(adminUser));
+          console.log('Admin user saved to localStorage:', adminUser);
+        } catch (error) {
+          console.error('Error saving to localStorage:', error);
+        }
         
         // Mettre à jour l'état utilisateur
         setUser(adminUser);
+        console.log('Admin user set in state:', adminUser);
 
         // Notification de succès
         toast({
@@ -328,25 +326,18 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const hasPermission = (permission: string): boolean => {
     if (!user) return false;
     
-    // Toujours autoriser l'accès si l'utilisateur est admin
-    if (user.role === 'admin' || user.username?.toLowerCase() === 'admin') {
-      return true; // Les admins ont toutes les permissions
-    }
+    // Les admins ont toutes les permissions
+    if (user.role === 'admin' || user.username?.toLowerCase() === 'admin') return true;
     
-    // Permissions spécifiques pour le caissier
-    if (user.role === 'cashier') {
-      const cashierPermissions = [
-        'dashboard.view',
-        'sales.view', 
-        'sales.create',
-        'finances.history',
-        'products.view'
-      ];
-      return cashierPermissions.includes(permission);
-    }
+    // Si pas de permission spécifiée, autoriser l'accès
+    if (!permission) return true;
     
-    // Vérifier les permissions dans le tableau permissions
-    return user.permissions?.includes(permission) || user.permissions?.includes('*') || false;
+    // Vérifier si l'utilisateur a la permission spécifique
+    if (user.permissions && user.permissions.includes('*')) return true;
+    if (user.permissions && user.permissions.includes(permission)) return true;
+    
+    // Vérifier via la configuration des rôles
+    return roleHasPermission(user.role as any, permission);
   };
 
   const hasAnyPermission = (permissions: string[]): boolean => {
@@ -417,18 +408,20 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return user.role === 'cashier';
   };
 
+  const contextValue: AuthContextType = {
+    user,
+    isLoading,
+    isAuthenticated: !!user && user.isLoggedIn === true,
+    login,
+    logout,
+    hasPermission,
+    hasAnyPermission,
+    hasRole,
+    hasAnyRole
+  };
+
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isAuthenticated: !!user,
-      login, 
-      logout, 
-      isLoading,
-      hasPermission,
-      hasAnyPermission,
-      hasRole,
-      hasAnyRole
-    }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

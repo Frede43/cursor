@@ -8,6 +8,7 @@ class UserSerializer(serializers.ModelSerializer):
     """
     
     password = serializers.CharField(write_only=True)
+    permissions = serializers.SerializerMethodField()
     
     class Meta:
         model = User
@@ -15,7 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'first_name', 'last_name',
             'role', 'phone', 'address', 'is_active', 'is_active_session',
             'last_activity', 'created_at', 'date_joined', 'last_login', 
-            'is_staff', 'is_superuser', 'password'
+            'is_staff', 'is_superuser', 'password', 'permissions'
         ]
         extra_kwargs = {
             'password': {'write_only': True},
@@ -45,6 +46,17 @@ class UserSerializer(serializers.ModelSerializer):
         
         instance.save()
         return instance
+    
+    def get_permissions(self, obj):
+        """Retourne la liste des codes de permissions de l'utilisateur"""
+        try:
+            permissions = obj.get_permissions()
+            perm_codes = [perm.code for perm in permissions]
+            print(f"DEBUG - Permissions pour {obj.username}: {perm_codes}")
+            return perm_codes
+        except Exception as e:
+            print(f"ERREUR - get_permissions pour {obj.username}: {e}")
+            return []
 
 
 class UserLoginSerializer(serializers.Serializer):

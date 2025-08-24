@@ -13,8 +13,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useAuth } from "@/hooks/use-auth";
-import { NotificationCenter } from "./NotificationCenter";
+import { useAuth } from "@/hooks/use-auth-dynamic";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface HeaderProps {
   className?: string;
@@ -25,7 +25,7 @@ export function Header({ className }: HeaderProps = {}) {
   const isMobile = useIsMobile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pageTitle, setPageTitle] = useState("Tableau de bord");
-  const { logout, user } = useAuth();
+  const { user, logout } = useAuth();
   
   // Update page title based on current route
   useEffect(() => {
@@ -82,7 +82,7 @@ export function Header({ className }: HeaderProps = {}) {
 
       <div className="flex items-center gap-4">
         {/* Notifications */}
-        <NotificationCenter />
+        <NotificationBell />
 
         {/* User Menu */}
         <DropdownMenu>
@@ -110,7 +110,7 @@ export function Header({ className }: HeaderProps = {}) {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout} className="cursor-pointer w-full flex items-center text-destructive">
+            <DropdownMenuItem onClick={() => logout()} className="cursor-pointer w-full flex items-center text-destructive">
               <LogOut className="h-4 w-4 mr-2" /> Déconnexion
             </DropdownMenuItem>
           </DropdownMenuContent>

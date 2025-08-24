@@ -2,7 +2,7 @@
  * Service d'authentification professionnel
  */
 
-import { LoginCredentials, LoginResponse, User } from '@/types/auth';
+import { LoginCredentials, LoginResponse, User, UserRole } from '@/types/auth';
 import { apiService } from './api';
 
 const AUTH_STORAGE_KEY = 'barstock_auth';
@@ -38,13 +38,22 @@ export class AuthService {
 
       if (response?.user) {
         const authData: StoredAuthData = {
-          user: response.user,
+          user: {
+            ...response.user,
+            role: response.user.role as UserRole
+          },
           sessionExpiry: Date.now() + SESSION_DURATION,
           lastActivity: Date.now()
         };
         
         this.storeAuthData(authData);
-        return response;
+        return {
+          ...response,
+          user: {
+            ...response.user,
+            role: response.user.role as UserRole
+          }
+        };
       }
       
       throw new Error('Réponse de connexion invalide');

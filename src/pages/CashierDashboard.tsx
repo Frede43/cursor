@@ -17,14 +17,20 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { useSalesStats, useDashboardStats } from "@/hooks/use-api";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
+// Removed useAuth import
 import { SalesStats, DashboardStats } from "@/types/api";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useNavigate } from "react-router-dom";
 
 const CashierDashboard = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  // Mock user data (no auth system)
+  const user = { 
+    username: 'admin', 
+    role: 'admin',
+    first_name: 'Admin',
+    last_name: 'User'
+  };
   const navigate = useNavigate();
   
   // Hooks pour récupérer les données depuis l'API
