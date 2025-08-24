@@ -555,9 +555,9 @@ export function useTables(params?: {
 export function useUpdateTableStatus() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   return useMutation({
-    mutationFn: ({ tableId, status }: { tableId: number; status: string }) => 
+    mutationFn: ({ tableId, status }: { tableId: number; status: string }) =>
       apiService.patch(`/apps/tables/${tableId}/`, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
@@ -573,6 +573,61 @@ export function useUpdateTableStatus() {
         variant: "destructive"
       });
     }
+  });
+}
+
+export function useOccupyTable() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ tableId, customerName, partySize }: {
+      tableId: number;
+      customerName: string;
+      partySize: number
+    }) =>
+      apiService.post(`/sales/tables/${tableId}/occupy/`, {
+        customer_name: customerName,
+        party_size: partySize
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      toast({
+        title: "Succès",
+        description: "Table occupée avec succès",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de l'occupation de la table",
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useFreeTable() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (tableId: number) =>
+      apiService.post(`/sales/tables/${tableId}/free/`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      toast({
+        title: "Succès",
+        description: "Table libérée avec succès",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la libération de la table",
+        variant: "destructive",
+      });
+    },
   });
 }
 
@@ -1531,5 +1586,163 @@ export function useSystemInfo() {
     queryFn: () => apiService.get('/settings/system-info/'),
     staleTime: 2 * 60 * 1000, // 2 minutes
     refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
+  });
+}
+
+
+// Hooks pour les réservations
+export const useReservations = (params?: {
+  date?: string;
+  status?: string;
+  table?: number;
+}) => {
+  return useQuery({
+    queryKey: ['reservations', params],
+    queryFn: () => apiService.get('/sales/reservations/', { params }),
+    staleTime: 30000,
+  });
+};
+
+export const useCreateReservation = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (data: {
+      table: number;
+      customer_name: string;
+      customer_phone?: string;
+      customer_email?: string;
+      party_size: number;
+      reservation_date: string;
+      reservation_time: string;
+      duration_minutes?: number;
+      special_requests?: string;
+    }) => apiService.post('/sales/reservations/', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      toast({
+        title: "Succès",
+        description: "Réservation créée avec succès",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la création de la réservation",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const useConfirmReservation = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (reservationId: number) =>
+      apiService.post(`/sales/reservations/${reservationId}/confirm/`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      toast({
+        title: "Succès",
+        description: "Réservation confirmée",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la confirmation",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const useConvertOrderToSale = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ orderId, data }: {
+      orderId: number;
+      data: { payment_method: string; notes?: string }
+    }) => apiService.post(`/orders/${orderId}/convert-to-sale/`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      toast({
+        title: "Succès",
+        description: "Commande convertie en vente",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la conversion",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export function useUpdateUser() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ userId, userData }: {
+      userId: string;
+      userData: any
+    }) => apiService.patch(`/accounts/users/${userId}/`, userData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast({
+        title: "Succès",
+        description: "Utilisateur mis à jour avec succès",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la mise à jour",
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useUpdateOrder() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) =>
+      apiService.patch(`/orders/${id}/`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast({
+        title: "Succès",
+        description: "Commande mise à jour",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la mise à jour",
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useUserProfile() {
+  return useQuery({
+    queryKey: ['profile'],
+    queryFn: () => apiService.get('/accounts/profile/'),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

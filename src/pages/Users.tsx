@@ -26,7 +26,7 @@ import {
   UserX,
   RefreshCw
 } from "lucide-react";
-import { useUsers, useUserActivities, useCreateUser, usePermissions, useAssignPermissions, useDeleteUser } from "@/hooks/use-api";
+import { useUsers, useUserActivities, useCreateUser, useUpdateUser, usePermissions, useAssignPermissions, useDeleteUser } from "@/hooks/use-api";
 import { useMutation } from '@tanstack/react-query';
 import { apiService } from '@/services/api';
 import { User as APIUser, UserActivity } from "@/types/api";
@@ -347,144 +347,178 @@ export default function Users() {
                   Nouvel utilisateur
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg">
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Créer un nouvel utilisateur</DialogTitle>
-                  <DialogDescription>
-                    Ajoutez un nouveau membre à votre équipe
+                  <DialogTitle className="text-xl font-semibold">Créer un nouvel utilisateur</DialogTitle>
+                  <DialogDescription className="text-base">
+                    Ajoutez un nouveau membre à votre équipe avec les informations complètes
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="username" className="text-sm">Nom d'utilisateur</Label>
-                    <Input
-                      id="username"
-                      value={newUser.username}
-                      onChange={(e) => setNewUser(prev => ({...prev, username: e.target.value}))}
-                      placeholder="nom.utilisateur"
-                      className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500 h-9"
-                    />
-                  </div>
+                <div className="space-y-6 py-4">
+                  {/* Informations de base */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium text-gray-900">Informations personnelles</h3>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="username" className="text-sm font-medium">Nom d'utilisateur *</Label>
+                        <Input
+                          id="username"
+                          value={newUser.username}
+                          onChange={(e) => setNewUser(prev => ({...prev, username: e.target.value}))}
+                          placeholder="nom.utilisateur"
+                          className="h-10"
+                          required
+                        />
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="first_name" className="text-sm">Prénom</Label>
-                      <Input
-                        id="first_name"
-                        value={newUser.first_name}
-                        onChange={(e) => setNewUser(prev => ({...prev, first_name: e.target.value}))}
-                        className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500 h-9"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="last_name" className="text-sm">Nom</Label>
-                      <Input
-                        id="last_name"
-                        value={newUser.last_name}
-                        onChange={(e) => setNewUser(prev => ({...prev, last_name: e.target.value}))}
-                        className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500 h-9"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <Label htmlFor="email" className="text-sm">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={newUser.email}
-                      onChange={(e) => setNewUser(prev => ({...prev, email: e.target.value}))}
-                      className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500 h-9"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="phone" className="text-sm">Téléphone</Label>
-                    <Input
-                      id="phone"
-                      value={newUser.phone}
-                      onChange={(e) => setNewUser(prev => ({...prev, phone: e.target.value}))}
-                      className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500 h-9"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="role" className="text-sm">Rôle</Label>
-                    <Select value={newUser.role} onValueChange={(value: User["role"]) => setNewUser(prev => ({...prev, role: value}))}>
-                      <SelectTrigger id="role" className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500 h-9">
-                        <SelectValue placeholder="Sélectionner un rôle" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {roles.map(role => (
-                          <SelectItem key={role.value} value={role.value}>
-                            {role.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-sm">Permissions</Label>
-                    {permissionsLoading ? (
-                      <p className="text-xs text-muted-foreground">Chargement...</p>
-                    ) : (
-                      <div className="border border-gray-200 rounded p-2 bg-gray-50">
-                        <div className="max-h-48 overflow-y-auto pr-2">
-                          {Array.isArray(permissionsData) && permissionsData.length > 0 ? (
-                            <>
-                              {/* Grouper les permissions par catégorie */}
-                              {Object.entries(
-                                permissionsData.reduce((acc: {[key: string]: any[]}, permission: any) => {
-                                  const category = permission.category || 'Autre';
-                                  if (!acc[category]) acc[category] = [];
-                                  acc[category].push(permission);
-                                  return acc;
-                                }, {})
-                              ).map(([category, permissions]: [string, any[]]) => (
-                                <div key={category} className="mb-3">
-                                  <h4 className="text-xs font-semibold text-gray-700 mb-1 uppercase">{category}</h4>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    {permissions.map((permission: any) => (
-                                      <div key={permission.code} className="flex items-center space-x-1 p-1 hover:bg-white rounded transition-colors">
-                                        <Checkbox
-                                          id={permission.code}
-                                          checked={newUser.permissions.includes(permission.code)}
-                                          onCheckedChange={(checked) => {
-                                            if (checked) {
-                                              setNewUser(prev => ({
-                                                ...prev,
-                                                permissions: [...prev.permissions, permission.code]
-                                              }));
-                                            } else {
-                                              setNewUser(prev => ({
-                                                ...prev,
-                                                permissions: prev.permissions.filter(p => p !== permission.code)
-                                              }));
-                                            }
-                                          }}
-                                          className="border-gray-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-3 w-3"
-                                        />
-                                        <Label htmlFor={permission.code} className="text-xs font-medium cursor-pointer">
-                                          {permission.name}
-                                        </Label>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                            </>
-                          ) : (
-                            <p className="text-xs text-muted-foreground col-span-2 text-center py-2">Aucune permission disponible</p>
-                          )}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="first_name" className="text-sm font-medium">Prénom *</Label>
+                          <Input
+                            id="first_name"
+                            value={newUser.first_name}
+                            onChange={(e) => setNewUser(prev => ({...prev, first_name: e.target.value}))}
+                            placeholder="Jean"
+                            className="h-10"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="last_name" className="text-sm font-medium">Nom *</Label>
+                          <Input
+                            id="last_name"
+                            value={newUser.last_name}
+                            onChange={(e) => setNewUser(prev => ({...prev, last_name: e.target.value}))}
+                            placeholder="Dupont"
+                            className="h-10"
+                            required
+                          />
                         </div>
                       </div>
-                    )}
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="email" className="text-sm font-medium">Email *</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={newUser.email}
+                          onChange={(e) => setNewUser(prev => ({...prev, email: e.target.value}))}
+                          placeholder="jean.dupont@example.com"
+                          className="h-10"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="phone" className="text-sm font-medium">Téléphone</Label>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          value={newUser.phone}
+                          onChange={(e) => setNewUser(prev => ({...prev, phone: e.target.value}))}
+                          placeholder="+257 XX XX XX XX"
+                          className="h-10"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium text-gray-900">Rôle et permissions</h3>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="role" className="text-sm font-medium">Rôle *</Label>
+                        <Select value={newUser.role} onValueChange={(value: any) => setNewUser(prev => ({...prev, role: value}))}>
+                          <SelectTrigger className="h-10">
+                            <SelectValue placeholder="Sélectionner un rôle" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">👑 Administrateur</SelectItem>
+                            <SelectItem value="manager">👔 Manager</SelectItem>
+                            <SelectItem value="server">🍽️ Serveur</SelectItem>
+                            <SelectItem value="cashier">💰 Caissier</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Permissions */}
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Permissions spéciales</Label>
+                        <div className="grid grid-cols-1 gap-3 max-h-48 overflow-y-auto border rounded-lg p-3 bg-gray-50">
+                          {permissionsData && permissionsData.map((permission: any) => (
+                            <div key={permission.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`perm-${permission.id}`}
+                                checked={newUser.permissions.includes(permission.codename)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setNewUser(prev => ({
+                                      ...prev,
+                                      permissions: [...prev.permissions, permission.codename]
+                                    }));
+                                  } else {
+                                    setNewUser(prev => ({
+                                      ...prev,
+                                      permissions: prev.permissions.filter(p => p !== permission.codename)
+                                    }));
+                                  }
+                                }}
+                              />
+                              <Label 
+                                htmlFor={`perm-${permission.id}`} 
+                                className="text-sm cursor-pointer"
+                              >
+                                {permission.name}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <Button onClick={createUser} className="w-full">
-                    Créer l'utilisateur
-                  </Button>
+                  {/* Note de sécurité */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start space-x-3">
+                      <Lock className="h-5 w-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <h4 className="text-sm font-medium text-blue-900">Sécurité</h4>
+                        <p className="text-sm text-blue-700 mt-1">
+                          Un mot de passe temporaire sera généré automatiquement. 
+                          L'utilisateur devra le changer lors de sa première connexion.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Boutons d'action */}
+                  <div className="flex justify-end space-x-3 pt-4 border-t">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowNewUserDialog(false)}
+                      className="px-6"
+                    >
+                      Annuler
+                    </Button>
+                    <Button 
+                      onClick={createUser}
+                      disabled={createUserMutation.isPending || !newUser.username || !newUser.first_name || !newUser.last_name || !newUser.email}
+                      className="px-6"
+                    >
+                      {createUserMutation.isPending ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          Création...
+                        </>
+                      ) : (
+                        <>
+                          <UserCheck className="h-4 w-4 mr-2" />
+                          Créer l'utilisateur
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
                 </div>
               </DialogContent>
             </Dialog>
