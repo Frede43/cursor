@@ -3,7 +3,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { NotificationProvider } from "./hooks/use-notifications";
 import { AuthProvider } from "./hooks/use-auth-dynamic";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute-dynamic";
 import Index from "./pages/Index.tsx";
@@ -30,7 +29,6 @@ import Monitoring from "./pages/Monitoring";
 import Help from "./pages/Help";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
-import { BottomNotificationProvider } from "./components/notifications/BottomNotificationProvider";
 
 const App = () => (
   <QueryProvider>
@@ -39,9 +37,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <NotificationProvider>
-            <BottomNotificationProvider>
-              <Routes>
+          <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={
               <ProtectedRoute requiredPermissions={['dashboard.view']} accessDeniedComponent={<AccessDenied />}>
@@ -154,9 +150,7 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BottomNotificationProvider>
-          </NotificationProvider>
+          </Routes>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

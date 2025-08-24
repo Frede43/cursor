@@ -48,6 +48,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
               accessToken, 
               localStorage.getItem('refresh_token') || ''
             );
+            
+            // Vérifier si nous sommes sur la page de login et rediriger si nécessaire
+            if (window.location.pathname === '/login') {
+              // Rediriger selon le rôle
+              window.location.href = userData.role === 'cashier' ? '/sales' : '/';
+            }
           } else {
             // Token invalide, nettoyer les données
             clearAuthData();
@@ -97,6 +103,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         
         // Configurer les tokens dans le service API
         apiService.setTokens(data.tokens.access, data.tokens.refresh);
+        
+        // Forcer un rafraîchissement de la page pour déclencher la redirection
+        window.location.href = data.user.role === 'cashier' ? '/sales' : '/';
         
         return true;
       }

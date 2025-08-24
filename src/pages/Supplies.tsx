@@ -25,6 +25,7 @@ import {
   Trash2
 } from "lucide-react";
 import { useSupplies, useSuppliers, useProducts, useCreateSupply, useValidateSupply, useRejectSupply } from "@/hooks/use-api";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 interface Supply {
@@ -84,6 +85,7 @@ export default function Supplies() {
     items: [{ product: "", quantityOrdered: 1, unitPrice: 0 }]
   });
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Récupérer les données des approvisionnements depuis l'API
   const {
@@ -140,11 +142,45 @@ export default function Supplies() {
   };
 
   const validateDelivery = (supplyId: string) => {
-    validateSupplyMutation.mutate(parseInt(supplyId));
+    validateSupplyMutation.mutate(parseInt(supplyId), {
+      onSuccess: () => {
+        toast({
+          title: "Succès",
+          description: "Approvisionnement validé avec succès",
+        });
+        // Mettre à jour les données de stock et produits après validation
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory'] });
+        queryClient.invalidateQueries({ queryKey: ['stock'] });
+        refetchSupplies();
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Erreur",
+          description: error.message || "Erreur lors de la validation",
+          variant: "destructive",
+        });
+      }
+    });
   };
 
   const rejectDelivery = (supplyId: string) => {
-    rejectSupplyMutation.mutate(parseInt(supplyId));
+    rejectSupplyMutation.mutate(parseInt(supplyId), {
+      onSuccess: () => {
+        toast({
+          title: "Succès",
+          description: "Approvisionnement rejeté avec succès",
+        });
+        refetchSupplies();
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Erreur",
+          description: error.message || "Erreur lors du rejet",
+          variant: "destructive",
+        });
+      }
+    });
   };
 
   // Fonctions de gestion du formulaire
@@ -179,11 +215,20 @@ export default function Supplies() {
 
   const addNewSupply = () => {
     // Validation
-    if (!newSupply.supplier || !newSupply.deliveryDate) {
+    if (!newSupply.supplier) {
       toast({
         title: "Erreur",
-        description: "Veuillez sélectionner un fournisseur et une date de livraison.",
-        variant: "destructive"
+        description: "Veuillez sélectionner un fournisseur",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newSupply.deliveryDate) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez sélectionner une date de livraison",
+        variant: "destructive",
       });
       return;
     }
@@ -191,45 +236,64 @@ export default function Supplies() {
     if (newSupply.items.some(item => !item.product || item.quantityOrdered <= 0 || item.unitPrice <= 0)) {
       toast({
         title: "Erreur",
-        description: "Veuillez remplir tous les champs des articles avec des valeurs valides.",
-        variant: "destructive"
+        description: "Veuillez vérifier les produits, quantités et prix",
+        variant: "destructive",
       });
       return;
     }
 
-    const supplyData = {
-      supplier: parseInt(newSupply.supplier),
+    // Format data for API
+    const formattedData = {
+      supplier_id: parseInt(newSupply.supplier),
       delivery_date: newSupply.deliveryDate,
       notes: newSupply.notes,
-      status: 'pending',
       items: newSupply.items.map(item => ({
-        product: parseInt(item.product),
+        product_id: parseInt(item.product),
         quantity_ordered: item.quantityOrdered,
-        quantity_received: 0,
         unit_price: item.unitPrice
       }))
     };
 
-    createSupplyMutation.mutate(supplyData, {
-      onSuccess: () => {
+    // Call API
+    createSupplyMutation.mutate(formattedData, {
+      onSuccess: (data) => {
         toast({
           title: "Succès",
-          description: "Approvisionnement créé avec succès.",
+          description: "Approvisionnement créé avec succès",
         });
+        
+        // Mettre à jour les données locales pour refléter le nouvel approvisionnement
+        if (suppliesData && Array.isArray(suppliesData.results)) {
+          const updatedSupplies = [...suppliesData.results];
+          // Ajouter le nouvel approvisionnement aux données existantes
+          if (data) {
+            updatedSupplies.unshift(data);
+          }
+        }
+        
+        // Forcer la mise à jour des données de stock et produits
+        // Cela permet de s'assurer que les pages de stock et produits sont mises à jour
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory'] });
+        queryClient.invalidateQueries({ queryKey: ['stock'] });
+        
+        // Réinitialiser le formulaire et fermer le dialogue
         setShowNewSupplyDialog(false);
         setNewSupply({
-          supplier: "",
-          deliveryDate: "",
-          notes: "",
-          items: [{ product: "", quantityOrdered: 1, unitPrice: 0 }]
+          supplier: '',
+          deliveryDate: new Date().toISOString().split('T')[0],
+          notes: '',
+          items: [{ product: '', quantityOrdered: 1, unitPrice: 0 }]
         });
+        
+        // Rafraîchir la liste des approvisionnements
         refetchSupplies();
       },
       onError: (error: any) => {
         toast({
           title: "Erreur",
-          description: error.message || "Erreur lors de la création de l'approvisionnement.",
-          variant: "destructive"
+          description: error.message || "Erreur lors de la création de l'approvisionnement",
+          variant: "destructive",
         });
       }
     });

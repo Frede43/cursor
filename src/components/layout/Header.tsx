@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/use-auth-dynamic";
-import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface HeaderProps {
   className?: string;
@@ -81,9 +80,6 @@ export function Header({ className }: HeaderProps = {}) {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Notifications */}
-        <NotificationBell />
-
         {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

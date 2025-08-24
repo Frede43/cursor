@@ -331,6 +331,48 @@ def dashboard_stats(request):
         daily_revenue = 0
         products_sold_today = []
 
+    # Données de tendance des ventes (7 derniers jours)
+    sales_trend = []
+    for i in range(7):
+        trend_date = today - timedelta(days=i)
+        day_sales = Sale.objects.filter(
+            created_at__date=trend_date,
+            status='paid'
+        )
+        day_revenue = day_sales.aggregate(total=Sum('total_amount'))['total'] or 0
+        sales_trend.append({
+            'date': trend_date.strftime('%Y-%m-%d'),
+            'sales': day_sales.count(),
+            'revenue': float(day_revenue)
+        })
+    
+    # Données de répartition des dépenses (si module expenses disponible)
+    expense_breakdown = []
+    try:
+        from expenses.models import Expense, ExpenseCategory
+        expense_categories = ExpenseCategory.objects.filter(is_active=True)
+        total_expenses = Expense.objects.filter(
+            expense_date=today,
+            is_approved=True
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        for category in expense_categories:
+            category_expenses = Expense.objects.filter(
+                expense_date=today,
+                category=category,
+                is_approved=True
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            
+            percentage = (float(category_expenses) / float(total_expenses) * 100) if total_expenses > 0 else 0
+            
+            expense_breakdown.append({
+                'category': category.name,
+                'amount': float(category_expenses),
+                'percentage': round(percentage, 2)
+            })
+    except ImportError:
+        expense_breakdown = []
+
     return Response({
         'today': {
             'date': today,
@@ -352,7 +394,9 @@ def dashboard_stats(request):
             'active_alerts': unresolved_alerts,
             'occupied_tables': occupied_tables,
             'total_tables': total_tables
-        }
+        },
+        'sales_trend': sales_trend,
+        'expense_breakdown': expense_breakdown
     })
 
 @api_view(['GET'])

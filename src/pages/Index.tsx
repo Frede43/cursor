@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
-import { useStockNotifications } from "@/hooks/use-stock-notifications";
-import { useOrderNotifications } from "@/hooks/use-order-notifications";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { AlertsWidget } from "@/components/dashboard/AlertsWidget";
@@ -32,9 +30,6 @@ const Index = () => {
   
   // Dashboard unifié pour tous les rôles avec permissions spécifiques
   
-  // Activer les notifications automatiques
-  useStockNotifications();
-  useOrderNotifications();
   
   // Hooks pour récupérer les données depuis l'API
   const {

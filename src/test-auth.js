@@ -43,7 +43,11 @@ function testAuth() {
     console.log('3. Collez et exécutez le code dans la console');
     console.log('\nCODE À COPIER:');
     console.log(`localStorage.setItem('user', '${JSON.stringify(user)}');`);
-    console.log('\nEnsuite, rafraîchissez la page pour être automatiquement connecté.');
+    console.log(`localStorage.setItem('access_token', 'test-token');`);
+    console.log(`localStorage.setItem('refresh_token', 'test-refresh-token');`);
+    console.log(`// Redirection vers le tableau de bord`);
+    console.log(`window.location.href = '${user.role === 'cashier' ? '/sales' : '/'}';`);
+    console.log('\nCe code vous connectera et vous redirigera automatiquement vers le tableau de bord.');
   } else {
     console.log('❌ Échec de l\'authentification!');
   }

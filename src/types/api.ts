@@ -227,7 +227,7 @@ export interface DashboardStats {
     daily_revenue: number;
     products_sold: Array<{
       product__name: string;
-      product__category: string;
+      product__category: number;
       quantity_sold: number;
       revenue: number;
     }>;
@@ -254,6 +254,17 @@ export interface DashboardStats {
   occupied_tables?: number;
   total_tables?: number;
   occupancy_rate?: string;
+  // Propriétés pour les rapports
+  sales_trend?: Array<{
+    date: string;
+    sales: number;
+    revenue: number;
+  }>;
+  expense_breakdown?: Array<{
+    category: string;
+    amount: number;
+    percentage: number;
+  }>;
 }
 
 // Types pour les statistiques de ventes

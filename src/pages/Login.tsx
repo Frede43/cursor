@@ -56,12 +56,9 @@ export default function Login() {
           description: `Bienvenue ${data.user.first_name || data.user.username}!`,
         });
         
-        // Redirection selon le rôle
-        if (data.user.role === 'cashier') {
-          navigate('/sales', { replace: true });
-        } else {
-          navigate('/', { replace: true });
-        }
+        // Forcer un rafraîchissement complet de la page pour garantir la redirection
+        const redirectPath = data.user.role === 'cashier' ? '/sales' : '/';
+        window.location.href = redirectPath;
       } else {
         const errorData = await response.json();
         toast({
