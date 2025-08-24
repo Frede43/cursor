@@ -1148,17 +1148,6 @@ export function useUserActivities(userId?: number) {
   });
 }
 
-export function useCreateUser() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (data: any) => apiService.post('/accounts/users/', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-    }
-  });
-}
-
 export function usePermissions(params?: { category?: string }) {
   return useQuery({
     queryKey: ['permissions', params],
@@ -1746,3 +1735,75 @@ export function useUserProfile() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
+
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (userData: {
+      username: string;
+      first_name: string;
+      last_name: string;
+      email: string;
+      phone?: string;
+      password: string;
+      role: string;
+      permissions?: string[];
+      is_active?: boolean;
+    }) => {
+      // Nettoyer les données avant envoi
+      const cleanData = {
+        username: userData.username.trim(),
+        first_name: userData.first_name.trim(),
+        last_name: userData.last_name.trim(),
+        email: userData.email.trim().toLowerCase(),
+        phone: userData.phone?.trim() || "",
+        password: userData.password,
+        role: userData.role,
+        is_active: userData.is_active !== false,
+        // Envoyer les permissions séparément si nécessaire
+        user_permissions: userData.permissions || []
+      };
+
+      console.log("Données envoyées:", cleanData);
+      return apiService.post('/accounts/users/', cleanData);
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast({
+        title: "Succès",
+        description: `Utilisateur ${data.username} créé avec succès`,
+      });
+    },
+    onError: (error: any) => {
+      console.error("Erreur création utilisateur:", error);
+      let errorMessage = "Erreur lors de la création de l'utilisateur";
+
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        if (typeof errorData === 'object') {
+          // Extraire les messages d'erreur spécifiques
+          const errors = [];
+          for (const [field, messages] of Object.entries(errorData)) {
+            if (Array.isArray(messages)) {
+              errors.push(`${field}: ${messages.join(', ')}`);
+            } else {
+              errors.push(`${field}: ${messages}`);
+            }
+          }
+          errorMessage = errors.join('; ');
+        } else {
+          errorMessage = errorData.toString();
+        }
+      }
+
+      toast({
+        title: "Erreur",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
