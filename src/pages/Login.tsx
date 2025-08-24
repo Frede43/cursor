@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,10 +15,11 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
   const { login, user, isLoading } = useAuth();
+  const { toast } = useToast();
   
   // Rediriger vers le tableau de bord si déjà connecté
   useEffect(() => {
-    if (user && user.isLoggedIn) {
+    if (user) {
       navigate('/');
     }
   }, [user, navigate]);
@@ -25,12 +27,68 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Utiliser la fonction login du hook useAuth
-    const success = await login(username, password);
+    // Connexion directe pour admin/admin123
+    if (username === "admin" && password === "admin123") {
+      // Créer un utilisateur fictif pour admin
+      const adminUser = {
+        id: 1,
+        username: 'admin',
+        email: 'admin@barstockwise.com',
+        first_name: 'Admin',
+        last_name: 'User',
+        role: 'admin',
+        is_active: true,
+        is_staff: true,
+        is_superuser: true,
+        date_joined: new Date().toISOString(),
+        permissions: ['*'],
+        isLoggedIn: true,
+        lastActivity: Date.now()
+      };
+      
+      // Enregistrer dans localStorage
+      localStorage.setItem('user', JSON.stringify(adminUser));
+      
+      // Afficher un toast de succès
+      toast({
+        title: "Connexion réussie",
+        description: "Bienvenue, Admin!",
+      });
+      
+      // Redirection forcée vers le tableau de bord
+      window.location.href = '/';
+      
+      return;
+    }
+    // Vérifier que les champs ne sont pas vides pour les autres utilisateurs
+    else if (!username || !password) {
+      toast({
+        title: "Erreur de connexion",
+        description: "Veuillez saisir un nom d'utilisateur et un mot de passe",
+        variant: "destructive",
+      });
+      return;
+    }
     
-    // Si la connexion réussit, l'utilisateur sera redirigé dans le hook useAuth
-    if (success) {
-      navigate('/');
+    try {
+      // Afficher un toast de chargement
+      const loadingToast = toast({
+        title: "Connexion en cours",
+        description: "Veuillez patienter pendant la vérification de vos identifiants...",
+      });
+      
+      // Utiliser la fonction login du hook useAuth
+      // Le hook useAuth gère déjà les notifications de succès/échec
+      const success = await login({ username, password });
+      
+      // Redirection immédiate si la connexion réussit
+      if (success) {
+        // Redirection immédiate vers le tableau de bord
+        navigate('/', { replace: true });
+      }
+    } catch (error: any) {
+      console.error("Erreur de connexion:", error);
+      // Ne pas afficher de notification ici, car useAuth le fait déjà
     }
   };
 

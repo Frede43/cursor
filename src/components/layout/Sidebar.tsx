@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAccessibleMenus, useCanAccessMenu, useUserPermissions } from "@/hooks/use-permissions";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useAuth } from "@/hooks/use-auth";
 import {
   BarChart3,
   Package,
@@ -129,9 +130,9 @@ function MenuItemComponent({ item, isCollapsed, isActive }: {
   isCollapsed: boolean;
   isActive: boolean;
 }) {
-  const canAccess = useCanAccessMenu(item.permissionKey as any);
+  const { canAccessMenu } = usePermissions();
 
-  if (!canAccess) {
+  if (item.permissionKey && !canAccessMenu(item.permissionKey as any)) {
     return null; // Ne pas afficher l'élément si l'utilisateur n'a pas les permissions
   }
 
@@ -181,7 +182,8 @@ export function Sidebar({ className }: SidebarProps = {}) {
     }), {})
   );
   const location = useLocation();
-  const { accessibleMenus, isLoading, userRole } = useAccessibleMenus();
+  const { accessibleMenus } = usePermissions();
+  const { user, isLoading, userRole } = useAuth();
 
   const toggleCategory = (categoryLabel: string) => {
     if (isCollapsed) return;
@@ -234,10 +236,10 @@ export function Sidebar({ className }: SidebarProps = {}) {
         ) : (
           <>
             {/* Affichage du rôle utilisateur */}
-            {!isCollapsed && userRole && (
+            {!isCollapsed && user && (
               <div className="mb-4 p-2 bg-primary-foreground/10 rounded-lg">
                 <p className="text-xs text-primary-foreground/70">Connecté en tant que:</p>
-                <p className="text-sm font-medium capitalize">{userRole}</p>
+                <p className="text-sm font-medium text-primary-foreground capitalize">{user.role}</p>
               </div>
             )}
 

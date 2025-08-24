@@ -70,7 +70,7 @@ class ApiService {
   // Méthode générique pour les requêtes HTTP
   private async request<T>(
     endpoint: string,
-    options: RequestInit & { params?: any } = {}
+    options: RequestInit & { params?: any; timeout?: number } = {}
   ): Promise<T> {
     let url = `${this.baseURL}${endpoint}`;
     
@@ -106,6 +106,17 @@ class ApiService {
       };
     }
 
+    // Créer un contrôleur d'abandon si aucun signal n'est fourni
+    let controller: AbortController | undefined;
+    let timeoutId: NodeJS.Timeout | undefined;
+    
+    if (!config.signal) {
+      controller = new AbortController();
+      const timeout = options.timeout || 10000; // 10 secondes par défaut
+      timeoutId = setTimeout(() => controller!.abort(), timeout);
+      config.signal = controller.signal;
+    }
+
     try {
       const response = await fetch(url, config);
 
@@ -126,26 +137,53 @@ class ApiService {
       return this.handleResponse<T>(response);
     } catch (error) {
       console.error('API Request Error:', error);
+      
+      // Améliorer les messages d'erreur pour les problèmes de connexion
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new Error('Impossible de se connecter au serveur. Vérifiez votre connexion internet ou contactez l\'administrateur.');
+      } else if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('La requête a pris trop de temps. Veuillez réessayer.');
+      }
+      
       throw error;
+    } finally {
+      // Nettoyer le timeout si on l'a créé
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     }
   }
 
   // Méthode pour gérer les erreurs de réponse
   private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
-      const errorData = await response.json();
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        // Si la réponse n'est pas du JSON valide
+        throw new Error(`HTTP Error: ${response.status} - ${response.statusText}`);
+      }
       
       // Si erreur 401 (Non autorisé), forcer la déconnexion
       if (response.status === 401) {
         this.handleAuthError();
       }
       
-      throw new Error(errorData.message || `HTTP Error: ${response.status}`);
+      // Amélioration de la gestion des erreurs
+      const errorMessage = errorData.message || errorData.detail || errorData.error || `HTTP Error: ${response.status}`;
+      console.error('API Error:', errorData);
+      throw new Error(errorMessage);
     }
 
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
-      return response.json();
+      try {
+        return await response.json();
+      } catch (e) {
+        console.error('Erreur de parsing JSON:', e);
+        throw new Error('Erreur lors de la lecture des données du serveur');
+      }
     }
 
     return response.text() as unknown as T;
@@ -154,7 +192,7 @@ class ApiService {
   // Gérer les erreurs d'authentification
   private handleAuthError() {
     // Nettoyer le localStorage
-    localStorage.removeItem('user');
+    this.clearTokensFromStorage();
     
     // Rediriger vers la page de connexion
     if (typeof window !== 'undefined') {
@@ -168,31 +206,60 @@ class ApiService {
   }
 
   // Authentification
-  async login(credentials: { username: string; password: string }): Promise<AuthResponse> {
-    const response = await this.post<AuthResponse>('/accounts/login/', credentials);
-    
-    if (response.tokens) {
-      this.setTokens(response.tokens.access, response.tokens.refresh);
-    }
-
-    // Récupérer les permissions de l'utilisateur après connexion
-    if (response.user && response.user.id) {
-      try {
-        const permissionsResponse = await this.get<any>(`/accounts/check-permissions/`);
-        response.user.role = permissionsResponse.role;
-        (response.user as any).permissions = Object.keys(permissionsResponse.permissions || {});
-      } catch (error) {
-        console.warn('Impossible de récupérer les permissions:', error);
+  async login(credentials: LoginCredentials): Promise<AuthResponse> {
+    try {
+      // Ajout d'un timeout plus long pour la requête de connexion
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 secondes de timeout
+      
+      const response = await this.request<AuthResponse>('/auth/login/', {
+        method: 'POST',
+        body: JSON.stringify(credentials),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response || !response.tokens) {
+        throw new Error('Réponse de connexion invalide du serveur');
       }
+      
+      this.saveTokensToStorage(response.tokens);
+      
+      // Récupérer les permissions de l'utilisateur après connexion
+      if (response.user && response.user.id) {
+        try {
+          const permissionsResponse = await this.get<any>('/accounts/permissions/');
+          const userData = {
+            ...response.user,
+            permissions: permissionsResponse.permissions || [],
+            role: permissionsResponse.role || 'user'
+          };
+          localStorage.setItem('user', JSON.stringify(userData));
+        } catch (error) {
+          console.warn('Impossible de récupérer les permissions:', error);
+          // Définir des valeurs par défaut pour éviter les erreurs
+          response.user.role = response.user.role || 'user';
+          (response.user as any).permissions = (response.user as any).permissions || [];
+          localStorage.setItem('user', JSON.stringify(response.user));
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Erreur lors de la connexion:', error);
+      // Amélioration du message d'erreur
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('La connexion au serveur a pris trop de temps. Veuillez réessayer.');
+      }
+      throw error;
     }
-    
-    return response;
   }
 
   async logout(): Promise<void> {
     if (this.refreshToken) {
       try {
-        await this.request('/accounts/logout/', {
+        await this.request('/auth/logout/', {
           method: 'POST',
           body: JSON.stringify({ refresh: this.refreshToken }),
         });
@@ -202,6 +269,17 @@ class ApiService {
     }
     
     this.clearTokensFromStorage();
+  }
+  
+  // Récupérer les permissions de l'utilisateur
+  async getUserPermissions(): Promise<string[]> {
+    try {
+      const response = await this.get('/accounts/permissions/');
+      return response.permissions || [];
+    } catch (error) {
+      console.error('Erreur lors de la récupération des permissions:', error);
+      return [];
+    }
   }
 
   private async refreshAccessToken(): Promise<boolean> {

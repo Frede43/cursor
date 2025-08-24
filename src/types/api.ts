@@ -39,6 +39,7 @@ export interface Product extends BaseModel {
   selling_price: number;
   current_stock: number;
   minimum_stock: number;
+  min_stock?: number; // Alias pour minimum_stock
   description?: string;
   is_active: boolean;
   profit_margin?: number;
@@ -111,6 +112,7 @@ export interface Sale extends BaseModel {
   items_count?: number;
   profit?: number;
   notes?: string;
+  invoice_url?: string; // URL de la facture générée
 }
 
 export interface SaleItem extends BaseModel {

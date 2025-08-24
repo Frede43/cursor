@@ -22,12 +22,16 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { useDashboardStats, useUnresolvedAlerts, useLowStockProducts, useSalesStats } from "@/hooks/use-api";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { DashboardStats, SalesStats } from "@/types/api";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { StatsCardSkeleton, ChartSkeleton } from "@/components/ui/loading-skeleton";
 
 const Index = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
+  
+  // Dashboard unifié pour tous les rôles avec permissions spécifiques
   
   // Activer les notifications automatiques
   useStockNotifications();

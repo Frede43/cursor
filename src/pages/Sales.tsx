@@ -87,7 +87,8 @@ export default function Sales() {
 
         // Déterminer le statut du stock
         const isOutOfStock = product.current_stock <= 0;
-        const isLowStock = product.current_stock <= (product.min_stock || 5) && product.current_stock > 0;
+        const minStockThreshold = product.min_stock || product.minimum_stock || 5;
+        const isLowStock = product.current_stock <= minStockThreshold && product.current_stock > 0;
 
         // Ajouter des facteurs limitants selon le stock
         const limitingFactors = [];
@@ -121,13 +122,21 @@ export default function Sales() {
 
   // Traiter les données de commande reçues
   useEffect(() => {
-    if (orderDataParam) {
+    if (orderDataParam && Object.keys(menu).length > 0) {
       try {
-        const decodedData = JSON.parse(decodeURIComponent(orderDataParam));
+        // Nettoyer le paramètre avant le parsing
+        const cleanParam = orderDataParam.replace(/<!DOCTYPE[^>]*>/gi, '').trim();
+        
+        if (!cleanParam || cleanParam.startsWith('<!DOCTYPE')) {
+          console.warn('Paramètre orderData invalide ou contient du HTML');
+          return;
+        }
+
+        const decodedData = JSON.parse(decodeURIComponent(cleanParam));
         setOrderData(decodedData);
 
         // Pré-remplir le panier avec les articles de la commande
-        if (decodedData.items && Object.keys(menu).length > 0) {
+        if (decodedData.items) {
           const preFilledCart: CartItem[] = [];
 
           decodedData.items.forEach((item: any) => {
@@ -155,56 +164,15 @@ export default function Sales() {
           });
         }
       } catch (error) {
+        console.error('Erreur parsing orderData:', error);
+        console.error('Paramètre reçu:', orderDataParam);
         toast({
           title: "Erreur",
-          description: "Impossible de charger les données de commande",
+          description: "Impossible de charger les données de commande - Format invalide",
           variant: "destructive",
         });
-      }
-    }
-  }, [orderDataParam, menu, toast]);
-
-  // Traiter les données de commande reçues
-  useEffect(() => {
-    if (orderDataParam) {
-      try {
-        const decodedData = JSON.parse(decodeURIComponent(orderDataParam));
-        setOrderData(decodedData);
-
-        // Pré-remplir le panier avec les articles de la commande
-        if (decodedData.items && menu) {
-          const preFilledCart: CartItem[] = [];
-
-          decodedData.items.forEach((item: any) => {
-            // Trouver l'article dans le menu
-            Object.values(menu).forEach(categoryItems => {
-              const menuItem = categoryItems.find(mi => mi.id === item.menu_item_id);
-              if (menuItem) {
-                preFilledCart.push({
-                  menu_item_id: menuItem.id,
-                  name: menuItem.name,
-                  price: menuItem.price,
-                  quantity: item.quantity,
-                  available_quantity: menuItem.availability.available_quantity
-                });
-              }
-            });
-          });
-
-          setCart(preFilledCart);
-
-          toast({
-            title: "Commande chargée",
-            description: `Table ${decodedData.tableNumber} - ${decodedData.serverName}`,
-            variant: "default",
-          });
-        }
-      } catch (error) {
-        toast({
-          title: "Erreur",
-          description: "Impossible de charger les données de commande",
-          variant: "destructive",
-        });
+        // Nettoyer l'URL pour éviter les erreurs répétées
+        window.history.replaceState({}, '', '/sales');
       }
     }
   }, [orderDataParam, menu, toast]);
@@ -329,11 +297,10 @@ export default function Sales() {
 
       // Utiliser l'API de ventes standard avec client, table et serveur
       const saleData = {
-        table: parseInt(selectedTable),
-        customer_name: customerName.trim(),
+        table_number: parseInt(selectedTable),
+        customer_name: customerName,
         server: parseInt(selectedServer),
         payment_method: 'cash' as const,
-        notes: `Vente directe - ${cart.length} articles - Serveur: ${serverName}`,
         items: cart.map(item => ({
           product: item.menu_item_id,
           quantity: item.quantity,
@@ -341,10 +308,14 @@ export default function Sales() {
           notes: `${item.name}`
         }))
       };
+      
+      console.log('Données de vente à envoyer:', JSON.stringify(saleData, null, 2));
 
       // Utiliser le hook de création de vente
       createSaleMutation.mutate(saleData, {
-        onSuccess: async (result) => {
+        onSuccess: async (result: any) => {
+          console.log('Résultat de la vente:', result);
+          
           toast({
             title: "Vente réussie !",
             description: `Vente créée pour ${customerName} - Table ${selectedTable}`,
@@ -352,18 +323,30 @@ export default function Sales() {
           });
 
           // Récupérer et afficher la facture imprimable
-          if (result.invoice_url) {
+          if (result?.invoice_url) {
             try {
               const response = await fetch(`http://127.0.0.1:8000${result.invoice_url}?format=json`);
               if (response.ok) {
-                const invoiceData = await response.json();
-                setInvoiceData(invoiceData.invoice);
-                setShowInvoice(true);
+                const responseText = await response.text();
+                console.log('Réponse facture brute:', responseText);
+                
+                // Vérifier si c'est du HTML au lieu de JSON
+                if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+                  console.warn('Réponse HTML reçue au lieu de JSON');
+                  // Ouvrir directement en HTML
+                  window.open(`http://127.0.0.1:8000${result.invoice_url}?format=html`, '_blank');
+                } else {
+                  const invoiceData = JSON.parse(responseText);
+                  setInvoiceData(invoiceData.invoice);
+                  setShowInvoice(true);
+                }
               }
             } catch (error) {
               console.error('Erreur récupération facture:', error);
               // Fallback: ouvrir dans un nouvel onglet
-              window.open(`http://127.0.0.1:8000${result.invoice_url}?format=html`, '_blank');
+              if (result.invoice_url) {
+                window.open(`http://127.0.0.1:8000${result.invoice_url}?format=html`, '_blank');
+              }
             }
           }
 
@@ -379,9 +362,27 @@ export default function Sales() {
           window.history.replaceState({}, '', '/sales');
         },
         onError: (error: any) => {
+          console.error('Erreur complète:', error);
+          console.error('Réponse brute:', error.response?.data);
+          
+          let errorMessage = "Erreur lors de la création de la vente";
+          
+          if (error.response?.data) {
+            // Si la réponse contient du HTML
+            if (typeof error.response.data === 'string' && error.response.data.includes('<!DOCTYPE')) {
+              errorMessage = "Erreur serveur - Réponse HTML inattendue";
+            } else if (error.response.data.message) {
+              errorMessage = error.response.data.message;
+            } else if (typeof error.response.data === 'object') {
+              errorMessage = JSON.stringify(error.response.data);
+            }
+          } else if (error.message) {
+            errorMessage = error.message;
+          }
+          
           toast({
             title: "Erreur de vente",
-            description: error.message || "Erreur lors de la création de la vente",
+            description: errorMessage,
             variant: "destructive",
           });
         }

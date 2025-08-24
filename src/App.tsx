@@ -3,9 +3,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./hooks/use-auth";
+import { useAuth, AuthProvider } from '@/hooks/use-auth';
 import { NotificationProvider } from "./hooks/use-notifications";
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Products from "./pages/Products";
@@ -43,39 +43,39 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           
           {/* Protected Routes */}
-          <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          <Route path="/" element={<ProtectedRoute requiredPermissions={['dashboard.view']}><Index /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute requiredPermissions={['dashboard.view']}><Index /></ProtectedRoute>} />
 
           {/* Authentication & Profile */}
-          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
-          <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute requiredPermissions={['profile.view']}><Profile /></ProtectedRoute>} />
+          <Route path="/products" element={<ProtectedRoute requiredPermissions={['products.view']}><Products /></ProtectedRoute>} />
+          <Route path="/sales" element={<ProtectedRoute requiredPermissions={['sales.view']}><Sales /></ProtectedRoute>} />
 
           {/* Stock Management */}
-          <Route path="/stocks" element={<ProtectedRoute><Stocks /></ProtectedRoute>} />
-          <Route path="/stock-sync" element={<ProtectedRoute><StockSync /></ProtectedRoute>} />
-          <Route path="/supplies" element={<ProtectedRoute><Supplies /></ProtectedRoute>} />
+          <Route path="/stocks" element={<ProtectedRoute requiredPermissions={['stocks.view']}><Stocks /></ProtectedRoute>} />
+          <Route path="/stock-sync" element={<ProtectedRoute requiredPermissions={['stocks.manage']}><StockSync /></ProtectedRoute>} />
+          <Route path="/supplies" element={<ProtectedRoute requiredPermissions={['stocks.manage']}><Supplies /></ProtectedRoute>} />
           <Route path="/kitchen" element={<ProtectedRoute><Kitchen /></ProtectedRoute>} />
 
           {/* Financial & Reports */}
-          <Route path="/sales-history" element={<ProtectedRoute><SalesHistory /></ProtectedRoute>} />
-          <Route path="/daily-report" element={<ProtectedRoute><DailyReport /></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-          <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+          <Route path="/sales-history" element={<ProtectedRoute requiredPermissions={['finances.history']}><SalesHistory /></ProtectedRoute>} />
+          <Route path="/daily-report" element={<ProtectedRoute requiredPermissions={['finances.reports']}><DailyReport /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute requiredPermissions={['finances.reports']}><Reports /></ProtectedRoute>} />
+          <Route path="/analytics" element={<ProtectedRoute requiredPermissions={['finances.view']}><Analytics /></ProtectedRoute>} />
 
           {/* Operational Pages */}
-          <Route path="/tables" element={<ProtectedRoute><Tables /></ProtectedRoute>} />
-          <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+          <Route path="/tables" element={<ProtectedRoute requiredPermissions={['tables.view']}><Tables /></ProtectedRoute>} />
+          <Route path="/orders" element={<ProtectedRoute requiredPermissions={['orders.view']}><Orders /></ProtectedRoute>} />
 
           {/* Administration */}
-          <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
-          <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
-          <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
+          <Route path="/users" element={<ProtectedRoute requiredPermissions={['users.view']}><Users /></ProtectedRoute>} />
+          <Route path="/suppliers" element={<ProtectedRoute requiredPermissions={['stocks.manage']}><Suppliers /></ProtectedRoute>} />
+          <Route path="/expenses" element={<ProtectedRoute requiredPermissions={['finances.view']}><Expenses /></ProtectedRoute>} />
 
           {/* System & Support */}
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute requiredPermissions={['settings.view']}><Settings /></ProtectedRoute>} />
           <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
-          <Route path="/monitoring" element={<ProtectedRoute><Monitoring /></ProtectedRoute>} />
+          <Route path="/monitoring" element={<ProtectedRoute requiredPermissions={['settings.view']}><Monitoring /></ProtectedRoute>} />
           <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
 
           {/* Catch-all route */}
