@@ -15,6 +15,7 @@ urlpatterns = [
     path('preferences/', views.preferences_view, name='preferences'),
     path('change-password/', views.change_password_view, name='change_password'),
     path('permissions/', views.check_permissions_view, name='permissions'),
+    path('check-permissions/', views.check_permissions_view, name='check_permissions'),
     
     # Gestion des utilisateurs
     path('users/', views.UserListCreateView.as_view(), name='user_list_create'),

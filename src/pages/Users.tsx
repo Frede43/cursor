@@ -275,7 +275,7 @@ export default function Users() {
              onclick="this.parentElement.remove()"></div>
       `;
       document.body.appendChild(alertDiv);
-
+      
       toast({
         title: "Mot de passe réinitialisé",
         description: `Nouveau mot de passe généré pour ${userName}`,

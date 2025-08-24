@@ -46,6 +46,7 @@ echo [4/4] Demarrage des services...
 echo.
 echo Backend Django: http://localhost:8000
 echo Frontend React: http://localhost:5173
+echo Network Access: http://192.168.43.253:5173
 echo.
 echo Appuyez sur Ctrl+C pour arreter les services
 echo.
@@ -56,4 +57,6 @@ start "BarStockWise Frontend" cmd /k "npm run dev"
 
 echo Services demarres avec succes!
 echo Ouvrez votre navigateur sur: http://localhost:5173
+echo Ou depuis le reseau: http://192.168.43.253:5173
+echo Connectez-vous avec: admin / admin123
 pause

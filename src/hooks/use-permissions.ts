@@ -15,7 +15,7 @@ interface UserPermissions {
 export function useUserPermissions() {
   return useQuery<UserPermissions>({
     queryKey: ['user-permissions'],
-    queryFn: () => apiService.get('/accounts/permissions/'),
+    queryFn: () => apiService.get('/accounts/check-permissions/'),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
@@ -52,85 +52,55 @@ export function useHasAnyPermission(permissionCodes: string[]) {
 
 /**
  * Configuration des menus avec leurs permissions requises
+ * Mapping exact avec les permissions du backend
  */
 export const MENU_PERMISSIONS = {
   // Dashboard - accessible à tous les utilisateurs connectés
   dashboard: [],
+
+  // Ventes - permissions selon le backend
+  sales: ['sales_manage', 'sales_create', 'sales_view'],
+  'sales-history': ['sales_history_view'],
+
+  // Produits - permissions selon le backend
+  products: ['products_view'],
+  'products-create': ['products_create', 'products_manage'],
+  'products-edit': ['products_edit', 'products_manage'],
+  'products-delete': ['products_delete', 'products_manage'],
+
+  // Stocks - permissions selon le backend
+  stocks: ['stocks_view', 'inventory_view'],
+  'stock-sync': ['stocks_manage', 'inventory_manage'],
+  supplies: ['suppliers_view', 'suppliers_manage'],
+
+  // Tables - permissions selon le backend
+  tables: ['tables_view', 'tables_manage'],
+
+  // Commandes - permissions selon le backend
+  orders: ['orders_view', 'sales_view'],
+  'orders-create': ['orders_create', 'sales_create'],
   
-  // Ventes - permissions étendues
-  sales: ['sales.view', 'sales.create'],
-  'sales-history': ['sales.history'],
-  'sales-manage': ['sales.manage'],
-  'sales-refund': ['sales.refund'],
-  'sales-discount': ['sales.discount'],
+  // Cuisine - permissions selon le backend
+  kitchen: ['kitchen_view'],
+
+  // Rapports et analyses - permissions selon le backend
+  'daily-report': ['reports_view'],
+  reports: ['reports_view'],
+  analytics: ['analytics_view'],
+
+  // Administration - permissions selon le backend (ADMIN SEULEMENT)
+  users: ['users_manage', 'users_view'],
+  suppliers: ['suppliers_view', 'suppliers_manage'],
+  expenses: ['expenses_view', 'expenses_manage'],
   
-  // Produits et stocks - permissions étendues
-  products: ['products.view'],
-  'products-create': ['products.create'],
-  'products-edit': ['products.edit'],
-  'products-delete': ['products.delete'],
-  stocks: ['stocks.view'],
-  'stock-sync': ['stocks.manage'],
-  'stocks-adjust': ['stocks.adjust'],
-  'stocks-transfer': ['stocks.transfer'],
-  supplies: ['stocks.manage'],
-  
-  // Tables et commandes - permissions étendues
-  tables: ['tables.view'],
-  'tables-manage': ['tables.manage'],
-  orders: ['orders.view'],
-  'orders-create': ['orders.create'],
-  'orders-edit': ['orders.edit'],
-  'orders-cancel': ['orders.cancel'],
-  
-  // Cuisine - permissions étendues
-  kitchen: ['kitchen.view'],
-  'kitchen-manage': ['kitchen.manage'],
-  
-  // Rapports et analyses - permissions étendues
-  'daily-report': ['reports.view'],
-  reports: ['reports.view'],
-  'reports-export': ['reports.export'],
-  analytics: ['analytics.view'],
-  'analytics-advanced': ['analytics.advanced'],
-  
-  // Administration - permissions étendues
-  users: ['users.view'],
-  'users-create': ['users.create'],
-  'users-edit': ['users.edit'],
-  'users-delete': ['users.delete'],
-  'users-permissions': ['users.permissions'],
-  suppliers: ['suppliers.view'],
-  'suppliers-manage': ['suppliers.manage'],
-  expenses: ['expenses.view'],
-  'expenses-create': ['expenses.create'],
-  'expenses-approve': ['expenses.approve'],
-  'expenses-manage': ['expenses.manage'],
-  
-  // Système - permissions étendues
-  settings: ['settings.view'],
-  'settings-manage': ['settings.manage'],
+  // Système - permissions selon le backend
+  settings: ['settings_manage'],
   alerts: [], // Accessible à tous
-  monitoring: ['monitoring.view'],
-  'system-backup': ['system.backup'],
-  'system-maintenance': ['system.maintenance'],
+  monitoring: ['monitoring_view'],
   help: [], // Accessible à tous
-  
+
   // Profil - accessible à tous
   profile: [],
-  
-  // Permissions spéciales pour caissiers
-  'cashier-sales': ['sales.view', 'sales.create'],
-  'cashier-history': ['sales.history'],
-  'cashier-refund': ['sales.refund'],
-  
-  // Permissions spéciales pour serveurs
-  'server-orders': ['orders.view', 'orders.create'],
-  'server-tables': ['tables.view'],
-  
-  // Permissions spéciales pour managers
-  'manager-reports': ['reports.view', 'analytics.view'],
-  'manager-users': ['users.view', 'users.edit'],
 } as const;
 
 /**
@@ -182,32 +152,30 @@ export function useAccessibleMenus() {
 }
 
 /**
- * Définition des rôles par défaut avec leurs permissions
+ * Définition des rôles par défaut avec leurs permissions (selon le backend)
  */
 export const DEFAULT_ROLE_PERMISSIONS = {
   admin: [], // Toutes les permissions
   manager: [
-    'sales.view', 'sales.create', 'sales.edit', 'sales.history',
-    'products.view', 'products.create', 'products.edit',
-    'stocks.view', 'stocks.manage', 'stocks.alerts',
-    'tables.view', 'tables.manage',
-    'orders.view', 'orders.manage',
-    'kitchen.view', 'kitchen.ingredients', 'kitchen.recipes',
-    'reports.view', 'reports.advanced', 'reports.export',
-    'analytics.view',
-    'suppliers.view', 'suppliers.manage',
-    'expenses.view', 'expenses.manage',
+    'sales_manage', 'sales_history_view', 'sales_view', 'sales_create',
+    'products_view', 'products_manage',
+    'stocks_view', 'inventory_manage',
+    'tables_view', 'tables_manage',
+    'orders_view', 'orders_create',
+    'kitchen_view',
+    'reports_view', 'analytics_view',
+    'suppliers_view', 'suppliers_manage',
+    'expenses_view', 'expenses_manage',
   ],
   server: [
-    'sales.view', 'sales.create',
-    'products.view',
-    'tables.view', 'tables.manage',
-    'orders.view', 'orders.manage',
+    'sales_view', 'sales_create',
+    'products_view',
+    'tables_view', 'tables_manage',
+    'orders_view', 'orders_create',
   ],
   cashier: [
-    'sales.view', 'sales.create',
-    'products.view',
-    'tables.view',
-    'orders.view',
+    'sales_manage', 'sales_history_view', 'sales_view', 'sales_create',
+    'products_view',
+    'tables_view', 'tables_manage',
   ]
 } as const;

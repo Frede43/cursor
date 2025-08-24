@@ -4,7 +4,7 @@
  */
 
 // Configuration de base
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Types pour l'authentification
 interface LoginCredentials {
@@ -133,14 +133,25 @@ class ApiService {
   // Méthode pour gérer les erreurs de réponse
   private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
-      const errorData = await response.json();
-      
+      let errorData: any = {};
+
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          errorData = await response.json();
+        } else {
+          errorData = { message: await response.text() };
+        }
+      } catch (e) {
+        errorData = { message: `HTTP Error: ${response.status}` };
+      }
+
       // Si erreur 401 (Non autorisé), forcer la déconnexion
       if (response.status === 401) {
         this.handleAuthError();
       }
-      
-      throw new Error(errorData.message || `HTTP Error: ${response.status}`);
+
+      throw new Error(errorData.message || errorData.error || `HTTP Error: ${response.status}`);
     }
 
     const contentType = response.headers.get('content-type');

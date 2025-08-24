@@ -12,12 +12,12 @@ from .models import Supplier
 from .serializers import SupplierSerializer, SupplierStatisticsSerializer
 from inventory.models import Purchase
 from inventory.serializers import PurchaseSerializer
-from accounts.permissions import IsAdminOrGerant, IsAuthenticated
+from accounts.permissions import IsAdminOrGerant, IsAuthenticated, CanManageSuppliers
 
 class SupplierViewSet(viewsets.ModelViewSet):
     queryset = Supplier.objects.all()
     serializer_class = SupplierSerializer
-    permission_classes = [permissions.AllowAny]  # Temporairement public pour tests
+    permission_classes = [CanManageSuppliers]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['is_active', 'city']
     search_fields = ['name', 'contact_person', 'phone', 'email', 'city']

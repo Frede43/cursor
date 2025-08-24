@@ -18,13 +18,17 @@ from .serializers import (
     ChangePasswordSerializer, UserProfileSerializer, UserWithPermissionsSerializer,
     CreateUserSerializer, PermissionSerializer, UserPermissionSerializer
 )
+from .permissions import (
+    IsAuthenticated, IsAdminOrGerant, IsAdmin, IsOwnerOrAdminOrGerant,
+    CanManageUsers, require_permission, require_role, admin_required
+)
 
 class UserListCreateView(generics.ListCreateAPIView):
     """
     Vue pour lister et créer des utilisateurs
     """
     queryset = User.objects.all()
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [CanManageUsers]
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -67,7 +71,7 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [CanManageUsers]
 
     def get_object(self):
         obj = super().get_object()
@@ -406,7 +410,7 @@ def user_permissions_view(request, user_id):
 
 
 @api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([CanManageUsers])
 def reset_password_view(request, pk):
     """
     Vue pour réinitialiser le mot de passe d'un utilisateur

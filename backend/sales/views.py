@@ -15,6 +15,7 @@ from .serializers import (
     TableSerializer, TableListSerializer, TableReservationSerializer,
     SaleSerializer, SaleListSerializer, SaleCreateSerializer, SaleUpdateStatusSerializer
 )
+from accounts.permissions import IsAuthenticated, IsAdminOrGerant, CanViewSales, CanCreateSales
 
 class TableListCreateView(generics.ListCreateAPIView):
     """
@@ -22,7 +23,7 @@ class TableListCreateView(generics.ListCreateAPIView):
     """
     queryset = Table.objects.all()
     serializer_class = TableSerializer
-    permission_classes = [permissions.AllowAny]  # Temporairement public pour les tests
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['is_active', 'status', 'location']
     search_fields = ['number', 'name', 'location']
@@ -61,7 +62,7 @@ class SaleListCreateView(generics.ListCreateAPIView):
     """
     Vue pour lister et créer des ventes
     """
-    permission_classes = [permissions.AllowAny]  # Temporairement public pour les tests
+    permission_classes = [CanViewSales]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['status', 'payment_method', 'table', 'server']
     search_fields = ['table__number', 'server__username', 'notes']
@@ -137,7 +138,7 @@ class SaleDetailView(generics.RetrieveUpdateDestroyAPIView):
     Vue pour récupérer, modifier ou supprimer une vente
     """
     serializer_class = SaleSerializer
-    permission_classes = [permissions.AllowAny]  # Temporairement public pour debug
+    permission_classes = [CanViewSales]
 
     def get_queryset(self):
         queryset = Sale.objects.select_related('table', 'server').prefetch_related('items__product')
@@ -452,7 +453,7 @@ class TableListView(generics.ListAPIView):
     """Vue pour lister les tables avec informations détaillées"""
     queryset = Table.objects.filter(is_active=True)
     serializer_class = TableListSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['status', 'capacity', 'location']
     search_fields = ['number', 'location']
