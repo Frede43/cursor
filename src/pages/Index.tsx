@@ -22,7 +22,7 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { useDashboardStats, useUnresolvedAlerts, useLowStockProducts, useSalesStats } from "@/hooks/use-api";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/use-auth";
 import { DashboardStats, SalesStats } from "@/types/api";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { StatsCardSkeleton, ChartSkeleton } from "@/components/ui/loading-skeleton";
