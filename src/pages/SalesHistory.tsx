@@ -209,10 +209,13 @@ export default function SalesHistory() {
 
   // Mémorisation des calculs
   const salesStats = useMemo(() => {
-    const totalSales = filteredSales.reduce((sum, sale) => {
-      const saleTotal = Number(sale.total) || 0;
-      return sum + saleTotal;
-    }, 0);
+    // CORRECTION: Exclure les ventes annulées du calcul du total
+    const totalSales = filteredSales
+      .filter(sale => sale.status !== "cancelled") // Exclure les ventes annulées
+      .reduce((sum, sale) => {
+        const saleTotal = Number(sale.total) || 0;
+        return sum + saleTotal;
+      }, 0);
     const completedSales = filteredSales.filter(sale => sale.status === "completed");
     const pendingSales = filteredSales.filter(sale => sale.status === "pending");
 
