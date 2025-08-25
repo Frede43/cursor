@@ -257,3 +257,5 @@ class PurchaseItem(models.Model):
         # Calculer le prix total
         self.total_price = self.unit_price * self.quantity_ordered
         super().save(*args, **kwargs)
+
+

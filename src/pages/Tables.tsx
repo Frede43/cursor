@@ -345,6 +345,16 @@ export default function Tables() {
                     </Button>
                   ) : table.status === "occupied" ? (
                     <div className="space-y-2">
+                      {table.customer && (
+                        <div className="text-xs text-muted-foreground">
+                          <strong>Client:</strong> {table.customer}
+                        </div>
+                      )}
+                      {table.server && (
+                        <div className="text-xs text-muted-foreground">
+                          <strong>Serveur:</strong> {table.server}
+                        </div>
+                      )}
                       {table.occupied_since && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />

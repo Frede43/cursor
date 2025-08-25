@@ -51,6 +51,7 @@ INSTALLED_APPS = [
 
     # Local apps
     'accounts',
+    'analytics',
     'products',
     'settings',
     'inventory',

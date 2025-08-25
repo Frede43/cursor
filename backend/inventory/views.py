@@ -261,3 +261,5 @@ class ProductMovementsView(APIView):
             },
             'movements': serializer.data
         })
+
+

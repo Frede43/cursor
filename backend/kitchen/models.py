@@ -32,6 +32,7 @@ class Ingredient(models.Model):
         default=Decimal('0.000'),
         verbose_name='Quantité restante'
     )
+    
 
     unite = models.CharField(
         max_length=10,

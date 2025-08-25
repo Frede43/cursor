@@ -57,7 +57,7 @@ export default function Orders() {
   // Extraire les données
   const orders = ordersData?.results || [];
   const tables = tablesData?.results || [];
-  const products = productsData || [];
+  const products = productsData?.results || [];
 
   const addItemToOrder = () => {
     if (!newItem.productId || !newItem.quantity) {

@@ -413,11 +413,16 @@ export interface UserActivity extends BaseModel {
 // Tables et Commandes
 export interface Table extends BaseModel {
   number: number;
-  name: string;
+  name?: string;
   capacity: number;
-  status: 'available' | 'occupied' | 'reserved' | 'maintenance';
+  status: 'available' | 'occupied' | 'reserved' | 'cleaning';
   location?: string;
   notes?: string;
+  occupied_since?: string;
+  server?: string;
+  customer?: string;
+  last_cleaned?: string;
+  is_active: boolean;
 }
 
 export interface Order extends BaseModel {

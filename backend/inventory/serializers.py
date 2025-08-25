@@ -246,3 +246,5 @@ class StockSummarySerializer(serializers.Serializer):
     stock_value = serializers.DecimalField(max_digits=12, decimal_places=2)
     last_movement_date = serializers.DateTimeField()
     needs_restock = serializers.BooleanField()
+
+
