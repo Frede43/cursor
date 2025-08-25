@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     'reports',
     'kitchen',
     'alerts',
+    'monitoring',
 ]
 
 MIDDLEWARE = [

@@ -1,10 +1,14 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
 
-app_name = 'analytics'
+# Router pour les ViewSets
+router = DefaultRouter()
 
 urlpatterns = [
-    # Graphiques et analytics
-    path('sales-chart/', views.sales_chart, name='sales_chart'),
-    path('product-sales/', views.product_sales_chart, name='product_sales_chart'),
+    # API ViewSets
+    path('', include(router.urls)),
+
+    # Vues spécifiques existantes
+    path('sales-chart/', views.sales_chart, name='sales-chart'),
 ]

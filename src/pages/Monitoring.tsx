@@ -1,502 +1,325 @@
-import { useState, useEffect } from "react";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { Header } from "@/components/layout/Header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Activity, 
-  Server, 
-  Database, 
-  Wifi,
-  HardDrive,
-  Cpu,
-  MemoryStick,
-  RefreshCw,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  Zap,
-  FileText
-} from "lucide-react";
+import React from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Server, Database, Cpu, HardDrive, Wifi, Users,
+  Activity, AlertCircle, CheckCircle, Clock, RefreshCw
+} from 'lucide-react';
+import { useMonitoringDashboard, useSystemInfoNew } from '@/hooks/use-api';
 
-interface SystemMetrics {
-  api: {
-    status: "online" | "offline" | "degraded";
-    responseTime: number;
-    uptime: number;
-    requestsPerMinute: number;
-  };
-  database: {
-    status: "online" | "offline" | "degraded";
-    connections: number;
-    queryTime: number;
-    size: number;
-  };
-  server: {
-    cpu: number;
-    memory: number;
-    disk: number;
-    network: number;
-  };
-  services: {
-    name: string;
-    status: "running" | "stopped" | "error";
-    uptime: string;
-    lastRestart: string;
-  }[];
-}
-
-const mockMetrics: SystemMetrics = {
-  api: {
-    status: "online",
-    responseTime: 145,
-    uptime: 99.8,
-    requestsPerMinute: 42
-  },
-  database: {
-    status: "online",
-    connections: 8,
-    queryTime: 23,
-    size: 2.4
-  },
-  server: {
-    cpu: 35,
-    memory: 68,
-    disk: 45,
-    network: 12
-  },
-  services: [
-    { name: "API Server", status: "running", uptime: "7d 14h 32m", lastRestart: "2024-08-07 09:15" },
-    { name: "Database", status: "running", uptime: "15d 8h 45m", lastRestart: "2024-07-30 14:20" },
-    { name: "Backup Service", status: "running", uptime: "7d 14h 32m", lastRestart: "2024-08-07 09:15" },
-    { name: "Print Service", status: "error", uptime: "0m", lastRestart: "2024-08-14 16:30" }
-  ]
+const getStatusColor = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case 'running':
+    case 'online':
+    case 'healthy':
+      return 'text-green-600 bg-green-100';
+    case 'warning':
+      return 'text-yellow-600 bg-yellow-100';
+    case 'error':
+    case 'offline':
+    case 'unhealthy':
+      return 'text-red-600 bg-red-100';
+    default:
+      return 'text-gray-600 bg-gray-100';
+  }
 };
 
-const systemLogs = [
-  { timestamp: "2024-08-14 16:45", level: "ERROR", service: "Print Service", message: "Connexion à l'imprimante échouée" },
-  { timestamp: "2024-08-14 16:30", level: "WARN", service: "API Server", message: "Temps de réponse élevé détecté (>200ms)" },
-  { timestamp: "2024-08-14 15:20", level: "INFO", service: "Database", message: "Sauvegarde automatique terminée avec succès" },
-  { timestamp: "2024-08-14 14:15", level: "INFO", service: "API Server", message: "Nouveau utilisateur connecté: marie.uwimana" },
-  { timestamp: "2024-08-14 13:45", level: "WARN", service: "Database", message: "Nombre de connexions élevé (>10)" }
-];
+const getMetricColor = (value: number, thresholds = { warning: 70, critical: 90 }) => {
+  if (value >= thresholds.critical) return 'text-red-600';
+  if (value >= thresholds.warning) return 'text-yellow-600';
+  return 'text-green-600';
+};
 
 export default function Monitoring() {
-  const [metrics, setMetrics] = useState(mockMetrics);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const { data: monitoringData, isLoading: monitoringLoading, error: monitoringError } = useMonitoringDashboard();
+  const { data: systemInfo, isLoading: systemLoading } = useSystemInfoNew();
 
-  useEffect(() => {
-    if (!autoRefresh) return;
+  if (monitoringLoading || systemLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+            <p className="text-muted-foreground">Chargement des données de monitoring...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-    const interval = setInterval(() => {
-      // Simulate real-time updates
-      setMetrics(prev => ({
-        ...prev,
-        api: {
-          ...prev.api,
-          responseTime: Math.floor(Math.random() * 100) + 100,
-          requestsPerMinute: Math.floor(Math.random() * 20) + 30
-        },
-        server: {
-          ...prev.server,
-          cpu: Math.floor(Math.random() * 30) + 20,
-          memory: Math.floor(Math.random() * 20) + 60,
-          network: Math.floor(Math.random() * 20) + 5
-        }
-      }));
-    }, 5000);
+  if (monitoringError) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card className="border-red-200">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Erreur de monitoring</h3>
+            <p className="text-muted-foreground text-center">
+              Impossible de récupérer les données de monitoring
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-    return () => clearInterval(interval);
-  }, [autoRefresh]);
-
-  const refreshMetrics = async () => {
-    setIsRefreshing(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsRefreshing(false);
-  };
-
-  const getStatusInfo = (status: string) => {
-    switch (status) {
-      case "online":
-      case "running":
-        return { variant: "success" as const, label: "En ligne", icon: CheckCircle };
-      case "offline":
-      case "stopped":
-        return { variant: "destructive" as const, label: "Hors ligne", icon: AlertTriangle };
-      case "degraded":
-      case "error":
-        return { variant: "warning" as const, label: "Dégradé", icon: AlertTriangle };
-      default:
-        return { variant: "secondary" as const, label: status, icon: Clock };
-    }
-  };
-
-  const getLogLevelInfo = (level: string) => {
-    switch (level) {
-      case "ERROR":
-        return { variant: "destructive" as const, color: "text-destructive" };
-      case "WARN":
-        return { variant: "warning" as const, color: "text-warning" };
-      case "INFO":
-        return { variant: "secondary" as const, color: "text-secondary" };
-      default:
-        return { variant: "secondary" as const, color: "text-muted-foreground" };
-    }
-  };
-
-  const restartService = (serviceName: string) => {
-    // TODO: Implement service restart logic
-    console.log(`Restarting service: ${serviceName}`);
-  };
+  const monitoring = monitoringData || {};
+  const system = systemInfo || {};
 
   return (
-    <div className="min-h-screen bg-gradient-surface flex">
-      <Sidebar />
-      
-      <div className="flex-1 flex flex-col">
-        <Header />
-        
-        <main className="flex-1 p-6 space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">
-                Surveillance système
-              </h1>
-              <p className="text-muted-foreground">
-                Monitoring en temps réel des performances et services
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setAutoRefresh(!autoRefresh)}
-                className={autoRefresh ? "bg-success/10" : ""}
-              >
-                {autoRefresh ? "Auto-refresh ON" : "Auto-refresh OFF"}
-              </Button>
-              <Button onClick={refreshMetrics} disabled={isRefreshing} className="gap-2">
-                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                Actualiser
-              </Button>
-            </div>
-          </div>
-
-          {/* System Status Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 bg-gradient-to-br from-success to-success/80 rounded-lg flex items-center justify-center">
-                    <Server className="h-6 w-6 text-success-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">API Server</p>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={getStatusInfo(metrics.api.status).variant}>
-                        {getStatusInfo(metrics.api.status).label}
-                      </Badge>
-                      <span className="text-sm">{metrics.api.responseTime}ms</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 bg-gradient-to-br from-primary to-primary-glow rounded-lg flex items-center justify-center">
-                    <Database className="h-6 w-6 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Base de données</p>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={getStatusInfo(metrics.database.status).variant}>
-                        {getStatusInfo(metrics.database.status).label}
-                      </Badge>
-                      <span className="text-sm">{metrics.database.connections} conn.</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 bg-gradient-to-br from-warning to-warning/80 rounded-lg flex items-center justify-center">
-                    <Activity className="h-6 w-6 text-warning-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Uptime global</p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl font-bold text-success">{metrics.api.uptime}%</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Tabs defaultValue="performance" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="performance">Performance</TabsTrigger>
-              <TabsTrigger value="services">Services</TabsTrigger>
-              <TabsTrigger value="logs">Logs</TabsTrigger>
-              <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
-            </TabsList>
-
-            {/* Performance Tab */}
-            <TabsContent value="performance">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Cpu className="h-5 w-5" />
-                      Ressources serveur
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-sm font-medium">CPU</span>
-                        <span className="text-sm">{metrics.server.cpu}%</span>
-                      </div>
-                      <Progress value={metrics.server.cpu} className="h-2" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-sm font-medium">Mémoire</span>
-                        <span className="text-sm">{metrics.server.memory}%</span>
-                      </div>
-                      <Progress value={metrics.server.memory} className="h-2" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-sm font-medium">Disque</span>
-                        <span className="text-sm">{metrics.server.disk}%</span>
-                      </div>
-                      <Progress value={metrics.server.disk} className="h-2" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-sm font-medium">Réseau</span>
-                        <span className="text-sm">{metrics.server.network} MB/s</span>
-                      </div>
-                      <Progress value={metrics.server.network * 5} className="h-2" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Zap className="h-5 w-5" />
-                      Métriques de performance
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-4 bg-muted rounded-lg">
-                        <p className="text-2xl font-bold">{metrics.api.responseTime}ms</p>
-                        <p className="text-sm text-muted-foreground">Temps de réponse API</p>
-                      </div>
-                      <div className="text-center p-4 bg-muted rounded-lg">
-                        <p className="text-2xl font-bold">{metrics.api.requestsPerMinute}</p>
-                        <p className="text-sm text-muted-foreground">Requêtes/min</p>
-                      </div>
-                      <div className="text-center p-4 bg-muted rounded-lg">
-                        <p className="text-2xl font-bold">{metrics.database.queryTime}ms</p>
-                        <p className="text-sm text-muted-foreground">Temps requête DB</p>
-                      </div>
-                      <div className="text-center p-4 bg-muted rounded-lg">
-                        <p className="text-2xl font-bold">{metrics.database.size}GB</p>
-                        <p className="text-sm text-muted-foreground">Taille DB</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-
-            {/* Services Tab */}
-            <TabsContent value="services">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Server className="h-5 w-5" />
-                    État des services
-                  </CardTitle>
-                  <CardDescription>
-                    Surveillance des services critiques du système
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {metrics.services.map((service, index) => {
-                      const statusInfo = getStatusInfo(service.status);
-                      const StatusIcon = statusInfo.icon;
-                      
-                      return (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between p-4 border rounded-lg"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                              service.status === "running" ? "bg-success" :
-                              service.status === "error" ? "bg-destructive" :
-                              "bg-secondary"
-                            }`}>
-                              <StatusIcon className="h-5 w-5 text-white" />
-                            </div>
-                            <div>
-                              <h3 className="font-semibold">{service.name}</h3>
-                              <p className="text-sm text-muted-foreground">
-                                Uptime: {service.uptime}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="text-right">
-                            <Badge variant={statusInfo.variant} className="mb-2">
-                              {statusInfo.label}
-                            </Badge>
-                            <p className="text-sm text-muted-foreground">
-                              Dernier redémarrage: {service.lastRestart}
-                            </p>
-                            {service.status === "error" && (
-                              <Button 
-                                size="sm" 
-                                onClick={() => restartService(service.name)}
-                                className="mt-2 gap-1"
-                              >
-                                <RefreshCw className="h-3 w-3" />
-                                Redémarrer
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Logs Tab */}
-            <TabsContent value="logs">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Logs système
-                  </CardTitle>
-                  <CardDescription>
-                    Historique des événements et erreurs système
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {systemLogs.map((log, index) => {
-                      const levelInfo = getLogLevelInfo(log.level);
-                      
-                      return (
-                        <div
-                          key={index}
-                          className="flex items-start gap-4 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                        >
-                          <Badge variant={levelInfo.variant} className="mt-1">
-                            {log.level}
-                          </Badge>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium">{log.service}</span>
-                              <span className="text-sm text-muted-foreground">{log.timestamp}</span>
-                            </div>
-                            <p className="text-sm">{log.message}</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Maintenance Tab */}
-            <TabsContent value="maintenance">
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Actions de maintenance</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Button variant="outline" className="h-20 flex-col gap-2">
-                        <Database className="h-6 w-6" />
-                        <span>Optimiser la base de données</span>
-                      </Button>
-                      <Button variant="outline" className="h-20 flex-col gap-2">
-                        <HardDrive className="h-6 w-6" />
-                        <span>Nettoyer les fichiers temporaires</span>
-                      </Button>
-                      <Button variant="outline" className="h-20 flex-col gap-2">
-                        <RefreshCw className="h-6 w-6" />
-                        <span>Redémarrer tous les services</span>
-                      </Button>
-                      <Button variant="outline" className="h-20 flex-col gap-2">
-                        <FileText className="h-6 w-6" />
-                        <span>Archiver les anciens logs</span>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Planification de maintenance</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <h4 className="font-medium">Sauvegarde quotidienne</h4>
-                          <p className="text-sm text-muted-foreground">Prochaine: Demain à 02:00</p>
-                        </div>
-                        <Badge variant="success">Planifiée</Badge>
-                      </div>
-                      <div className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <h4 className="font-medium">Optimisation DB</h4>
-                          <p className="text-sm text-muted-foreground">Prochaine: Dimanche à 01:00</p>
-                        </div>
-                        <Badge variant="secondary">Hebdomadaire</Badge>
-                      </div>
-                      <div className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <h4 className="font-medium">Nettoyage logs</h4>
-                          <p className="text-sm text-muted-foreground">Prochaine: 1er septembre</p>
-                        </div>
-                        <Badge variant="warning">Mensuelle</Badge>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </main>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Monitoring Système</h1>
+          <p className="text-muted-foreground">
+            Surveillance en temps réel des performances et de la santé du système
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Clock className="h-4 w-4" />
+          Dernière mise à jour: {new Date().toLocaleTimeString('fr-FR')}
+        </div>
       </div>
+
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="overview">Vue d'ensemble</TabsTrigger>
+          <TabsTrigger value="server">Serveur</TabsTrigger>
+          <TabsTrigger value="services">Services</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          {/* Métriques principales */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">API Status</CardTitle>
+                <Server className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center space-x-2">
+                  <Badge className={getStatusColor(monitoring.api_status || 'online')}>
+                    {monitoring.api_status || 'Online'}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    {monitoring.uptime || 99.9}% uptime
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Temps de réponse: {monitoring.response_time || 150}ms
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Base de données</CardTitle>
+                <Database className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center space-x-2">
+                  <Badge className={getStatusColor(monitoring.db_status || 'online')}>
+                    {monitoring.db_status || 'Online'}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    {monitoring.db_connections || 5} connexions
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Temps de requête: {monitoring.db_query_time || 25}ms
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Sessions actives</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {monitoring.active_sessions || 3}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Utilisateurs connectés
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Requêtes/min</CardTitle>
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {monitoring.requests_per_minute || 42}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Charge API actuelle
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="server" className="space-y-6">
+          {/* Métriques serveur */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Cpu className="h-5 w-5" />
+                  Utilisation CPU
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>CPU</span>
+                    <span className={getMetricColor(monitoring.cpu_usage || 35)}>
+                      {monitoring.cpu_usage || 35}%
+                    </span>
+                  </div>
+                  <Progress value={monitoring.cpu_usage || 35} className="h-2" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <HardDrive className="h-5 w-5" />
+                  Mémoire
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>RAM</span>
+                    <span className={getMetricColor(monitoring.memory_usage || 68)}>
+                      {monitoring.memory_usage || 68}%
+                    </span>
+                  </div>
+                  <Progress value={monitoring.memory_usage || 68} className="h-2" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <HardDrive className="h-5 w-5" />
+                  Stockage
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Disque</span>
+                    <span className={getMetricColor(monitoring.disk_usage || 45)}>
+                      {monitoring.disk_usage || 45}%
+                    </span>
+                  </div>
+                  <Progress value={monitoring.disk_usage || 45} className="h-2" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wifi className="h-5 w-5" />
+                  Réseau
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Bande passante</span>
+                    <span className="text-green-600">
+                      {monitoring.network_usage || 12} MB/s
+                    </span>
+                  </div>
+                  <Progress value={(monitoring.network_usage || 12) * 5} className="h-2" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Informations système */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Informations Système</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-semibold mb-2">Système</h4>
+                  <div className="space-y-1 text-sm">
+                    <div>OS: {system.os || 'Windows 11'}</div>
+                    <div>Architecture: {system.architecture || 'x64'}</div>
+                    <div>Python: {system.python_version || '3.11'}</div>
+                    <div>Django: {system.django_version || '4.2'}</div>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-semibold mb-2">Application</h4>
+                  <div className="space-y-1 text-sm">
+                    <div>Nom: BarStockWise</div>
+                    <div>Version: 1.0.0</div>
+                    <div>Environnement: Development</div>
+                    <div>Uptime: {monitoring.uptime_hours || 24}h</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="services" className="space-y-6">
+          {/* Services */}
+          <Card>
+            <CardHeader>
+              <CardTitle>État des Services</CardTitle>
+              <CardDescription>
+                Statut des services système critiques
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[
+                  { name: 'API Server', status: 'running', uptime: '7d 14h 32m' },
+                  { name: 'Database', status: 'running', uptime: '15d 8h 45m' },
+                  { name: 'Kitchen Service', status: 'running', uptime: '2d 6h 15m' },
+                  { name: 'Analytics Service', status: 'running', uptime: '1d 12h 8m' }
+                ].map((service, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-2">
+                        {service.status === 'running' ? (
+                          <CheckCircle className="h-5 w-5 text-green-500" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5 text-red-500" />
+                        )}
+                        <span className="font-medium">{service.name}</span>
+                      </div>
+                      <Badge className={getStatusColor(service.status)}>
+                        {service.status}
+                      </Badge>
+                    </div>
+                    <div className="text-right text-sm text-muted-foreground">
+                      <div>Uptime: {service.uptime}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -36,6 +36,7 @@ urlpatterns = [
     path('api/kitchen/', include('kitchen.urls')),
     path('api/analytics/', include('analytics.urls')),
     path('api/alerts/', include('alerts.urls')),  # Ajout des alertes
+    path('api/monitoring/', include('monitoring.urls')),  # Ajout du monitoring
 ]
 
 # Servir les fichiers media en développement

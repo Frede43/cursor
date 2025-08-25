@@ -1807,3 +1807,167 @@ export function useCreateUser() {
   });
 }
 
+// ==================== HOOKS ALERTES DYNAMIQUES ====================
+
+export function useAlertsNew(params?: {
+  type?: string;
+  priority?: string;
+  status?: string;
+  search?: string;
+}) {
+  return useQuery({
+    queryKey: ['alerts-new', params],
+    queryFn: () => apiService.get('/alerts/alerts/', { params }),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+export function useActiveAlertsCount() {
+  return useQuery({
+    queryKey: ['alerts-count'],
+    queryFn: async () => {
+      const response = await apiService.get('/alerts/alerts/active/');
+      return {
+        total_active: response.length,
+        critical_active: response.filter((alert: any) => alert.priority === 'critical').length,
+        high_active: response.filter((alert: any) => alert.priority === 'high').length,
+        has_critical: response.some((alert: any) => alert.priority === 'critical')
+      };
+    },
+    staleTime: 1 * 60 * 1000, // 1 minute
+    refetchInterval: 30 * 1000, // Rafraîchir toutes les 30 secondes
+  });
+}
+
+export function useCreateAlert() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (alertData: {
+      type: string;
+      priority: string;
+      title: string;
+      message: string;
+      related_product?: number;
+      related_sale?: number;
+    }) => apiService.post('/alerts/alerts/', alertData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alerts-new'] });
+      queryClient.invalidateQueries({ queryKey: ['alerts-count'] });
+      toast({
+        title: "Succès",
+        description: "Alerte créée avec succès",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la création de l'alerte",
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useResolveAlertNew() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (alertId: string) => apiService.post(`/alerts/alerts/${alertId}/resolve/`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alerts-new'] });
+      queryClient.invalidateQueries({ queryKey: ['alerts-count'] });
+      toast({
+        title: "Succès",
+        description: "Alerte résolue",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la résolution",
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useArchiveAlertNew() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (alertId: string) => apiService.post(`/alerts/alerts/${alertId}/archive/`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alerts-new'] });
+      queryClient.invalidateQueries({ queryKey: ['alerts-count'] });
+      toast({
+        title: "Succès",
+        description: "Alerte archivée",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de l'archivage",
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+// ==================== HOOKS MONITORING ====================
+
+export function useMonitoringDashboard() {
+  return useQuery({
+    queryKey: ['monitoring-dashboard'],
+    queryFn: () => apiService.get('/monitoring/stats/'),
+    staleTime: 30 * 1000, // 30 secondes
+    refetchInterval: 60 * 1000, // Rafraîchir chaque minute
+  });
+}
+
+export function useSystemInfoNew() {
+  return useQuery({
+    queryKey: ['system-info-new'],
+    queryFn: () => apiService.get('/settings/system-info/'),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+}
+
+// ==================== HOOKS SETTINGS ====================
+
+export function useSystemSettingsNew() {
+  return useQuery({
+    queryKey: ['system-settings-new'],
+    queryFn: () => apiService.get('/settings/system/'),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+export function useUpdateSystemSettingsNew() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (settings: Record<string, any>) =>
+      apiService.patch('/settings/system/', settings),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['system-settings-new'] });
+      toast({
+        title: "Succès",
+        description: "Paramètres mis à jour",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la mise à jour",
+        variant: "destructive",
+      });
+    },
+  });
+}
+

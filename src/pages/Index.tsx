@@ -20,7 +20,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
-import { useDashboardStats, useUnresolvedAlerts, useLowStockProducts, useSalesStats } from "@/hooks/use-api";
+import { useDashboardStats, useUnresolvedAlerts, useLowStockProducts, useSalesStats, useActiveAlertsCount, useMonitoringDashboard } from "@/hooks/use-api";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardStats, SalesStats } from "@/types/api";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -56,6 +56,16 @@ const Index = () => {
     isLoading: alertsLoading
   } = useUnresolvedAlerts();
 
+  const {
+    data: alertsCount,
+    isLoading: alertsCountLoading
+  } = useActiveAlertsCount();
+
+  const {
+    data: monitoringData,
+    isLoading: monitoringLoading
+  } = useMonitoringDashboard();
+
   // Mémorisation des données de ventes pour éviter les re-rendus inutiles
   const formattedSalesData = useMemo(() => {
     if ((salesStats as SalesStats)?.hourly_sales) {
@@ -81,20 +91,28 @@ const Index = () => {
   // Mémorisation des valeurs pour éviter les re-rendus
   const statsValues = useMemo(() => {
     const stats = dashboardStats as DashboardStats;
+    const monitoring = monitoringData as any;
+    const alerts = alertsCount as any;
+
     return {
       todaySales: stats?.today_sales || stats?.today?.daily_revenue || 0,
       pendingOrders: stats?.pending_orders || stats?.today?.pending_sales || 0,
       totalProducts: stats?.quick_stats?.total_products || 0,
-      lowStockAlerts: stats?.alerts?.low_stock || 0,
+      lowStockAlerts: alerts?.total_active || stats?.alerts?.low_stock || 0,
       occupiedTables: stats?.occupied_tables || 0,
       totalTables: stats?.total_tables || 0,
       salesChange: stats?.sales_change || "0%",
       salesChangeType: stats?.sales_change_type || "neutral",
       ordersChange: stats?.orders_change || "0",
       ordersChangeType: stats?.orders_change_type || "neutral",
-      occupancyRate: stats?.occupancy_rate || "0%"
+      occupancyRate: stats?.occupancy_rate || "0%",
+      // Nouvelles métriques dynamiques
+      criticalAlerts: alerts?.critical_active || 0,
+      systemStatus: monitoring?.api?.status || 'unknown',
+      activeSessions: monitoring?.active_sessions || 0,
+      serverHealth: monitoring?.server?.cpu || 0
     };
-  }, [dashboardStats]);
+  }, [dashboardStats, monitoringData, alertsCount]);
 
   // Fonction pour actualiser les données
   const handleRefresh = () => {
@@ -165,12 +183,12 @@ const Index = () => {
                     description="en cours"
                   />
                   <StatsCard
-                    title="Produits en stock"
-                    value={statsValues.totalProducts.toString()}
-                    change={statsValues.lowStockAlerts.toString()}
-                    changeType="negative"
-                    icon={Package}
-                    description="alertes critiques"
+                    title="Alertes système"
+                    value={statsValues.lowStockAlerts.toString()}
+                    change={statsValues.criticalAlerts.toString()}
+                    changeType={statsValues.criticalAlerts > 0 ? "negative" : "positive"}
+                    icon={AlertTriangle}
+                    description="critiques"
                   />
                   <StatsCard
                     title="Tables occupées"

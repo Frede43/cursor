@@ -15,6 +15,7 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/use-auth";
 import { NotificationCenter } from "./NotificationCenter";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface HeaderProps {
   className?: string;
@@ -81,8 +82,8 @@ export function Header({ className }: HeaderProps = {}) {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Notifications */}
-        <NotificationCenter />
+        {/* Notifications dynamiques */}
+        <NotificationBell />
 
         {/* User Menu */}
         <DropdownMenu>
